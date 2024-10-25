@@ -9,10 +9,12 @@
 
 (define *grid-size* 50)
 (define *point-radius* 10)
+(define *frames-per-pos* 5)
 
 (define *speed-base* 2)
 (define *map-mult* 2)
 (define *map-size* (list (* *window-width* 2) (* *window-height* 2)))
+
 (define *n-points* 128)
 
 (define dgl:min (- 0 (car *map-size*)))
@@ -58,36 +60,54 @@
     (values rs (list x y))))
 
 ;; generate n points, call cb with every
-(define (random-points rs n min max cb)
+(define (random-points rs n min max cb acc)
   (if (= n 0)
-      rs
+      (values acc rs)
       (lets ((rs pt (random-point rs min max)))
         (cb pt)
-        (random-points rs (- n 1) min max cb))))
+        (random-points rs (- n 1) min max cb (append acc (list pt))))))
 
-(define (pointer)
+;; meant to be ran over the network
+(define (decider)
   (lets ((min (- 0 (car *map-size*)))
          (max (cadr *map-size*))
-         (rs (random-points
-              (seed->rands (time-ms))
-              *n-points* min max
-              (λ (x) (mail 'threadmain (tuple 'add! x))))))
-    (let loop ((rs rs))
+         (points rs (random-points
+                     (seed->rands (time-ms))
+                     *n-points* min max
+                     (λ (x) (mail 'threadmain (tuple 'add! x)))
+                     ())))
+
+    (print "decider ready")
+    (let loop ((points points) (rs rs))
       (lets ((who m (next-mail)))
         (print "who: " who ", m: " m)
         (tuple-case m
-          ((delete! ref)
-           (lets ((rs pt (random-point rs min max)))
-             (print "Adding point: " pt)
-             (mail who (tuple 'add! pt))
-             (loop rs)))
+          ((update-pos! pos size) ;; TODO: store size per user somewhere here
+           (lets ((collided rest (let loop ((cacc #n) (racc #n) (pts points))
+                                   (cond
+                                    ((null? pts) (values cacc racc))
+                                    ((collision-circles? (car pts) *point-radius* pos (+ 10 size))
+                                     (mail who (tuple 'enlarge!))
+                                     (mail who (tuple 'del! (car pts)))
+                                     (loop (append cacc (list (car pts))) racc (cdr pts)))
+                                    (else
+                                     (loop cacc (append racc (list (car pts))) (cdr pts)))))))
+             (let L ((rs rs) (acc #n) (p collided))
+               (if (null? p)
+                   (loop (append rest acc) rs)
+                   (lets ((rs pt (random-point rs min max)))
+                     (mail who (tuple 'add! pt))
+                     (L rs (append acc (list pt)) (cdr p)))))))
           (else
            (print "shid, invalid-message " m)
-           (mail who (tuple 'invalid-message))
-           (loop rs)))))))
+           ;; (mail who (tuple 'invalid-message))
+           (loop points rs)))))))
+
+(define (mesgof sym q)
+  (filter (λ (x) (eq? (ref x 1) sym)) q))
 
 (define (main)
-  (thread 'pointer (pointer))
+  (thread 'decider (decider))
   (next-thread)
   (set-target-fps! 60)
   (with-window
@@ -98,6 +118,7 @@
               (size 0)
               (zoom 1.0)
               (speed-mult 2.0)
+              (frame-ctr 0)
               )
      (let* ((mailq (let loop ((acc #n))
                      (lets ((_ v (maybe-next-mail)))
@@ -111,15 +132,14 @@
             (pos (list x y))
             (camera (list *cam-offset* pos 0 zoom))
             ;; update data based on mailq
-            (points (append points (map (C ref 2) (filter (λ (x) (eq? (ref x 1) 'add!)) mailq))))
-            (points size (let loop ((+size 0) (acc #n) (points points) (i 0))
-                           (cond
-                            ((null? points) (values acc (+ size +size)))
-                            ((collision-circles? (car points) *point-radius* pos (+ 10 size))
-                             (mail 'pointer (tuple 'delete! i))
-                             (loop (+ +size 1) acc (cdr points) (+ i 1)))
-                            (else
-                             (loop +size (append acc (list (car points))) (cdr points) (+ i 1)))))))
+            (points (fold (λ (acc pt) (filter (λ (x) (not (equal? x pt))) acc)) points (map (C ref 2) (mesgof 'del! mailq))))
+            (points (append points (map (C ref 2) (mesgof 'add! mailq))))
+            (size (+ size (len (mesgof 'enlarge! mailq))))
+            )
+
+       (when (= frame-ctr 0)
+         (mail 'decider (tuple 'update-pos! pos size)))
+
        (draw
         (clear-background gray)
         (with-camera2d
@@ -134,7 +154,8 @@
         )
        (if (window-should-close?)
            0
-           (loop x y points size (+ zoom (* 0.2 (mouse-wheel))) speed-mult))))))
+           (loop x y points size (+ zoom (* 0.2 (mouse-wheel))) speed-mult (modulo (+ frame-ctr 1) *frames-per-pos*)))))))
 
 (λ (_)
-  (thread 'threadmain (main)))
+  (thread 'threadmain (main))
+  (ref (wait-mail) 2))
