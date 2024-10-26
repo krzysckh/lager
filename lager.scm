@@ -48,7 +48,7 @@
     (for-each
      (λ (pt) (draw-circle (remap-point-to-map map-box pt) 2 green))
      points)
-    (draw-circle user (max 1 (round (remap size 0 (* 2 *map-size*) 0 map:sz))) red)
+    (draw-circle user (max 2 (round (remap size 0 (* 2 *map-size*) 0 map:sz))) red)
     ))
 
 ;; rs min max → rs (x y)
