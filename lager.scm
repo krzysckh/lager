@@ -65,6 +65,17 @@
         (cb pt)
         (random-points rs (- n 1) min max cb (append acc (list pt))))))
 
+(define (mail* targets v)
+  (print "mail* mailing to: " targets)
+  (if (null? targets)
+      #t
+      (begin
+        (mail (car targets) v)
+        (mail* (cdr targets) v))))
+
+(define (player-threads l)
+  (map cadr l))
+
 ;; meant to be ran over the network
 (define (decider)
   (lets ((min (- 0 *map-size*))
@@ -72,41 +83,59 @@
          (points rs (random-points
                      (seed->rands (time-ms))
                      *n-points* min max
-                     (λ (x) (mail 'threadmain (tuple 'add! x)))
+                     (λ (x) (print "init-point " x))
                      ())))
 
     (print "decider ready")
-    (let loop ((points points) (rs rs))
+    (let loop ((players #n) (points points) (rs rs))
       (lets ((who m (next-mail)))
         (print "who: " who ", m: " m)
         (tuple-case m
+          ((add-player! name thread) ;; TODO: check if a player can be added
+           (mail who (tuple 'okay))
+           (for-each
+            (λ (pt) (mail thread (tuple 'add! pt)))
+            points)
+           (loop (append players (list (list name thread 0))) points rs))
           ((update-pos! pos size) ;; TODO: store size per user somewhere here
            (lets ((collided rest (let loop ((cacc #n) (racc #n) (pts points))
                                    (cond
                                     ((null? pts) (values cacc racc))
                                     ((collision-circles? (car pts) *point-radius* pos (+ 10 size))
                                      (mail who (tuple 'enlarge!))
-                                     (mail who (tuple 'del! (car pts)))
+                                     (mail* (player-threads players) (tuple 'del! (car pts)))
                                      (loop (append cacc (list (car pts))) racc (cdr pts)))
                                     (else
                                      (loop cacc (append racc (list (car pts))) (cdr pts)))))))
              (let L ((rs rs) (acc #n) (p collided))
                (if (null? p)
-                   (loop (append rest acc) rs)
+                   (loop players (append rest acc) rs)
                    (lets ((rs pt (random-point rs min max)))
-                     (mail who (tuple 'add! pt))
+                     (mail* (player-threads players) (tuple 'add! pt))
                      (L rs (append acc (list pt)) (cdr p)))))))
           (else
            (print "shid, invalid-message " m)
            ;; (mail who (tuple 'invalid-message))
-           (loop points rs)))))))
+           (loop players points rs)))))))
 
 (define (mesgof sym q)
   (filter (λ (x) (eq? (ref x 1) sym)) q))
 
-(define (main)
-  (thread 'decider (decider))
+(define (add-player name thread)
+  (let ((v (interact 'decider (tuple 'add-player! name thread))))
+    (tuple-case v
+      ((error why)
+       (print-to stderr "couldn't add-player " name ": " why)
+       #f)
+      (else ;; okay we ballin
+       (print "okay we ballin")
+       #t))))
+
+(define (lager player-name thrname)
   (set-target-fps! 60)
+  (when (not (add-player player-name thrname))
+    (error "shid" ""))
+
   (with-window
    *window-size* *window-size* "*lager*"
    (let loop ((x 0)
@@ -158,6 +187,9 @@
            (draw-grid)
            (for-each (λ (pos) (draw-circle pos *point-radius* green)) points)
            (draw-circle pos (+ 10 size) red)
+           (lets ((tw th (measure-text (get-font-default) player-name 14 0)))
+             (draw-text-simple player-name (list (- (car pos) (/ tw 2)) (- (cadr pos) (/ th 2))) 14 white)
+             (draw-text-simple player-name (list (- (car pos) (/ tw 2) -1) (- (cadr pos) (/ th 2) -1)) 14 black))
            ))
         (draw-map pos points size)
         (draw-fps 0 0)
@@ -167,5 +199,6 @@
            (loop x y points size (+ zoom (* 0.01 (mouse-wheel))) speed-mult (modulo (+ frame-ctr 1) *frames-per-pos*)))))))
 
 (λ (_)
-  (thread 'threadmain (main))
+  (thread 'decider (decider))
+  (thread 'threadmain (lager "local player" 'threadmain))
   (ref (wait-mail) 2))
