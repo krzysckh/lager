@@ -12,7 +12,7 @@
 
 (define *speed-base* 5)
 (define *map-mult* 2)
-(define *map-size* (* *window-size* 2))
+(define *map-size* (* *window-size* 4))
 
 (define *n-points* 128)
 
@@ -142,8 +142,13 @@
        (when (or (any (λ (pt) (collision-circles? pt *point-radius* pos (+ 10 size))) points) (= frame-ctr 0))
          (mail 'decider (tuple 'update-pos! pos size)))
 
-       (when (key-down? key-equal)
-         (mail 'threadmain (tuple 'enlarge!)))
+       ;; (when (key-down? key-equal)
+       ;;   (let loop ((i 0))
+       ;;     (if (= i 10)
+       ;;         #n
+       ;;         (let ()
+       ;;           (print (mail 'threadmain (tuple 'enlarge!)))
+       ;;           (loop (+ 1 i))))))
 
        (draw
         (clear-background gray)
@@ -159,7 +164,7 @@
         )
        (if (window-should-close?)
            0
-           (loop x y points size (+ zoom (* 0.2 (mouse-wheel))) speed-mult (modulo (+ frame-ctr 1) *frames-per-pos*)))))))
+           (loop x y points size (+ zoom (* 0.01 (mouse-wheel))) speed-mult (modulo (+ frame-ctr 1) *frames-per-pos*)))))))
 
 (λ (_)
   (thread 'threadmain (main))
