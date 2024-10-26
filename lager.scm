@@ -66,7 +66,6 @@
         (random-points rs (- n 1) min max cb (append acc (list pt))))))
 
 (define (mail* targets v)
-  (print "mail* mailing to: " targets)
   (if (null? targets)
       #t
       (begin
@@ -75,6 +74,15 @@
 
 (define (player-threads l)
   (map cadr l))
+
+(define (edit-player players player f)
+  (let loop ((acc #n) (players players))
+    (cond
+     ((null? players) acc)
+     ((string=? (car player) (caar players))
+      (loop (append acc (list (f (car players)))) (cdr players)))
+     (else
+      (loop (append acc (list (car players))) (cdr players))))))
 
 ;; meant to be ran over the network
 (define (decider)
@@ -96,23 +104,32 @@
            (for-each
             (λ (pt) (mail thread (tuple 'add! pt)))
             points)
-           (loop (append players (list (list name thread 0))) points rs))
-          ((update-pos! pos size) ;; TODO: store size per user somewhere here
-           (lets ((collided rest (let loop ((cacc #n) (racc #n) (pts points))
-                                   (cond
-                                    ((null? pts) (values cacc racc))
-                                    ((collision-circles? (car pts) *point-radius* pos (+ 10 size))
-                                     (mail who (tuple 'enlarge!))
-                                     (mail* (player-threads players) (tuple 'del! (car pts)))
-                                     (loop (append cacc (list (car pts))) racc (cdr pts)))
-                                    (else
-                                     (loop cacc (append racc (list (car pts))) (cdr pts)))))))
-             (let L ((rs rs) (acc #n) (p collided))
-               (if (null? p)
-                   (loop players (append rest acc) rs)
-                   (lets ((rs pt (random-point rs min max)))
-                     (mail* (player-threads players) (tuple 'add! pt))
-                     (L rs (append acc (list pt)) (cdr p)))))))
+           (mail thread (tuple 'set-size! 10))
+           (loop (append players (list (list name thread 10))) points rs))
+          ((update-pos! pos)
+           (let ((player (filter (λ (x) (equal? (lref x 1) who)) players)))
+             (when (null? player)
+               (print "Couldn't find " who player)
+               (halt 1)) ;; TODO: don't halt, make sure this never happens
+
+             (lets ((collided rest (let loop ((cacc #n) (racc #n) (pts points))
+                                     (cond
+                                      ((null? pts) (values cacc racc))
+                                      ((collision-circles? (car pts) *point-radius* pos (lref (car player) 2))
+                                       (mail who (tuple 'set-size! (+ (lref (car player) 2) 1)))
+                                       (mail* (player-threads players) (tuple 'del! (car pts)))
+                                       (loop (append cacc (list (car pts))) racc (cdr pts)))
+                                      (else
+                                       (loop cacc (append racc (list (car pts))) (cdr pts)))))))
+               (let L ((rs rs) (acc #n) (p collided))
+                 (if (null? p)
+                     (loop (if (null? collided)
+                               players
+                               (edit-player players (car player) (λ (pl) (lset pl 2 (+ (lref pl 2) 1)))))
+                           (append rest acc) rs)
+                     (lets ((rs pt (random-point rs min max)))
+                       (mail* (player-threads players) (tuple 'add! pt))
+                       (L rs (append acc (list pt)) (cdr p))))))))
           (else
            (print "shid, invalid-message " m)
            ;; (mail who (tuple 'invalid-message))
@@ -164,12 +181,15 @@
             ;; update data based on mailq
             (points (fold (λ (acc pt) (filter (λ (x) (not (equal? x pt))) acc)) points (map (C ref 2) (mesgof 'del! mailq))))
             (points (append points (map (C ref 2) (mesgof 'add! mailq))))
-            (size (+ size (len (mesgof 'enlarge! mailq))))
+            (size (let ((msgs (mesgof 'set-size! mailq)))
+                    (if (null? msgs)
+                        size
+                        (ref (last msgs 'bug) 2))))
             )
 
        ;; ask the decider to update location every n frames or if i think a a point was touched
-       (when (or (any (λ (pt) (collision-circles? pt *point-radius* pos (+ 10 size))) points) (= frame-ctr 0))
-         (mail 'decider (tuple 'update-pos! pos size)))
+       (when (or (any (λ (pt) (collision-circles? pt *point-radius* pos size)) points) (= frame-ctr 0))
+         (mail 'decider (tuple 'update-pos! pos)))
 
        ;; (when (key-down? key-equal)
        ;;   (let loop ((i 0))
@@ -186,7 +206,7 @@
          (begin
            (draw-grid)
            (for-each (λ (pos) (draw-circle pos *point-radius* green)) points)
-           (draw-circle pos (+ 10 size) red)
+           (draw-circle pos size red)
            (lets ((tw th (measure-text (get-font-default) player-name 14 0)))
              (draw-text-simple player-name (list (- (car pos) (/ tw 2)) (- (cadr pos) (/ th 2))) 14 white)
              (draw-text-simple player-name (list (- (car pos) (/ tw 2) -1) (- (cadr pos) (/ th 2) -1)) 14 black))
