@@ -112,6 +112,9 @@
                (print "Couldn't find " who player)
                (halt 1)) ;; TODO: don't halt, make sure this never happens
 
+             (for-each (λ (p) (mail (lref p 1) (tuple 'set-pos-of! (append (car player) (list pos)))))
+                       (filter (λ (x) (not (equal? (car player) x))) players))
+
              (lets ((collided rest (let loop ((cacc #n) (racc #n) (pts points))
                                      (cond
                                       ((null? pts) (values cacc racc))
@@ -148,10 +151,35 @@
        (print "okay we ballin")
        #t))))
 
+(define (draw-player pos size color name)
+  (draw-circle pos size color)
+  (lets ((tw th (measure-text (get-font-default) name 16 0)))
+    (draw-text-simple name (list (- (car pos) (/ tw 2)) (- (cadr pos) (/ th 2))) 16 white)
+    (draw-text-simple name (list (- (car pos) (/ tw 2) -1) (- (cadr pos) (/ th 2) -1)) 16 black)))
+
 (define (lager player-name thrname)
   (set-target-fps! 60)
   (when (not (add-player player-name thrname))
     (error "shid" ""))
+
+  (add-player "bot test" 'bots)
+  (thread
+   'bots
+   (let ()
+     (mail 'decider (tuple 'update-pos! (list 0 0)))
+     (wait-mail)
+     (let loop ()
+       (print "bots: skipping: " (check-mail))
+       (if (check-mail)
+           (loop)
+           #t))
+     (let loop ((x 0))
+       (lets ((a b (next-mail)))
+         (print "[bot sigma] " a ": " b)
+         (mail 'decider (tuple 'update-pos! (list x 0)))
+         (next-thread)
+         (print "bots after next-thread")
+         (loop (+ x 3))))))
 
   (with-window
    *window-size* *window-size* "*lager*"
@@ -161,6 +189,7 @@
               (size 0)
               (zoom 1.0)
               (speed-mult 2.0)
+              (players ())
               (frame-ctr 0)
               )
      (lets ((mailq (let loop ((acc #n))
@@ -185,6 +214,13 @@
                     (if (null? msgs)
                         size
                         (ref (last msgs 'bug) 2))))
+            (players (let loop ((msgs (mesgof 'set-pos-of! mailq)) (players players))
+                       (cond
+                        ((null? msgs) players)
+                        ((assoc (car (ref (car msgs) 2)) players) ;; player exists in mem, change data
+                         (loop (cdr msgs) (edit-player players (ref (car msgs) 2) (λ (pl) (ref (car msgs) 2)))))
+                        (else
+                         (loop (cdr msgs) (append players (list (ref (car msgs) 2))))))))
             )
 
        ;; ask the decider to update location every n frames or if i think a a point was touched
@@ -206,17 +242,23 @@
          (begin
            (draw-grid)
            (for-each (λ (pos) (draw-circle pos *point-radius* green)) points)
-           (draw-circle pos size red)
-           (lets ((tw th (measure-text (get-font-default) player-name 14 0)))
-             (draw-text-simple player-name (list (- (car pos) (/ tw 2)) (- (cadr pos) (/ th 2))) 14 white)
-             (draw-text-simple player-name (list (- (car pos) (/ tw 2) -1) (- (cadr pos) (/ th 2) -1)) 14 black))
+           (draw-player pos size red player-name)
+           (for-each (λ (pl) (draw-player (lref pl 3) (lref pl 2) blue (car pl))) players)
            ))
         (draw-map pos points size)
         (draw-fps 0 0)
         )
        (if (window-should-close?)
            0
-           (loop x y points size (+ zoom (* 0.01 (mouse-wheel))) speed-mult (modulo (+ frame-ctr 1) *frames-per-pos*)))))))
+           (loop
+            x
+            y
+            points
+            size
+            (+ zoom (* 0.01 (mouse-wheel)))
+            speed-mult
+            players
+            (modulo (+ frame-ctr 1) *frames-per-pos*)))))))
 
 (λ (_)
   (thread 'decider (decider))
