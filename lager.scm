@@ -100,12 +100,18 @@
         (print "who: " who ", m: " m)
         (tuple-case m
           ((add-player! name thread) ;; TODO: check if a player can be added
-           (mail who (tuple 'okay))
-           (for-each
-            (λ (pt) (mail thread (tuple 'add! pt)))
-            points)
-           (mail thread (tuple 'set-size! 10))
-           (loop (append players (list (list name thread 10))) points rs))
+           (print "add-player!: will send data to " thread ", who=" who)
+           (if (any (λ (p) (string=? (car p) name)) players)
+               (begin
+                 (mail who (tuple 'error "Player with that name already exists on this server"))
+                 (loop players points rs))
+               (begin
+                 (mail who (tuple 'okay))
+                 (for-each
+                  (λ (pt) (mail thread (tuple 'add! pt)))
+                  points)
+                 (mail thread (tuple 'set-size! 10))
+                 (loop (append players (list (list name thread 10))) points rs))))
           ((update-pos! pos)
            (let ((player (filter (λ (x) (equal? (lref x 1) who)) players)))
              (when (null? player)
@@ -141,28 +147,38 @@
 (define (mesgof sym q)
   (filter (λ (x) (eq? (ref x 1) sym)) q))
 
-(define (add-player name thread)
-  (let ((v (interact 'decider (tuple 'add-player! name thread))))
-    (tuple-case v
-      ((error why)
-       (print-to stderr "couldn't add-player " name ": " why)
-       #f)
-      (else ;; okay we ballin
-       (print "okay we ballin")
-       #t))))
-
 (define (draw-player pos size color name)
   (draw-circle pos size color)
   (lets ((tw th (measure-text (get-font-default) name 16 0)))
     (draw-text-simple name (list (- (car pos) (/ tw 2)) (- (cadr pos) (/ th 2))) 16 white)
     (draw-text-simple name (list (- (car pos) (/ tw 2) -1) (- (cadr pos) (/ th 2) -1)) 16 black)))
 
+;; this is a different thread because of fuckery
+;; if a bot thread is started from the player thread, the thread that wants to start
+;; a bot thread may not receive a confirmation (#[okay]) but rather a command that was
+;; meant to be sent to a player/bot thread (e.g. #[add ...])
+(define (start-player-adder)
+  (thread
+   'add-player
+   (let loop ()
+     (lets ((who v (next-mail)))
+       (mail who (interact 'decider (tuple 'add-player! (ref v 1) (ref v 2))))
+       (loop)))))
+
+(define-syntax add-player
+  (syntax-rules (interact)
+    ((add-player name threadname)
+     (interact 'add-player (tuple name threadname)))))
+
 (define (lager player-name thrname)
   (set-target-fps! 60)
-  (when (not (add-player player-name thrname))
-    (error "shid" ""))
+  (tuple-case (add-player player-name thrname)
+    ((error why)
+     (error "couldn't add player to the game: " why))
+    (else
+     #t))
 
-  (add-player "bot test" 'bots)
+  (print "bots?: " (add-player "bot test" 'bots))
   (thread
    'bots
    (let ()
@@ -262,5 +278,6 @@
 
 (λ (_)
   (thread 'decider (decider))
+  (start-player-adder)
   (thread 'threadmain (lager "local player" 'threadmain))
   (ref (wait-mail) 2))
