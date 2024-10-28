@@ -22,7 +22,7 @@ jobs:
           sudo add-apt-repository universe
           sudo dpkg --add-architecture i386
           sudo apt update
-          sudo apt install -y wine wine32
+          sudo apt install -y wine wine32 bmake
       - name: Setup raylib
         shell: bash
         run: |
@@ -35,5 +35,5 @@ jobs:
       - name: Upload as artifact
         uses: actions/upload-artifact@v3
         with:
-          name: slgj-2024
+          name: lager
           path: build/
