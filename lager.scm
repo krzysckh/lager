@@ -4,6 +4,7 @@
  (lager const)
  (lager decider)
  (lager common)
+ (lager assets)
  )
 
 (define (draw-grid)
@@ -41,9 +42,9 @@
 
 (define (draw-player pos size color name)
   (draw-circle pos size color)
-  (lets ((tw th (measure-text (get-font-default) name 16 0)))
-    (draw-text-simple name (list (- (car pos) (/ tw 2)) (- (cadr pos) (/ th 2))) 16 white)
-    (draw-text-simple name (list (- (car pos) (/ tw 2) -1) (- (cadr pos) (/ th 2) -1)) 16 black)))
+  (lets ((font (asset 'font))
+         (tw th (measure-text font name 16 0)))
+    (draw-text font name (list (- (car pos) (/ tw 2)) (- (cadr pos) (/ th 2))) 16 0 black)))
 
 ;; this is a different thread because of fuckery
 ;; if a bot thread is started from the player thread, the thread that wants to start
@@ -102,15 +103,18 @@
 
 (define (draw-leaderboard player-size player-name players)
   (let ((ps (sort (λ (a b) (> (car a) (car b)))
-                  (append (map (λ (p) (list (lref p 2) (car p))) players) (list (list player-size player-name))))))
+                  (append (map (λ (p) (list (lref p 2) (car p))) players) (list (list player-size player-name)))))
+        (font (asset 'font)))
     (let loop ((i 1) (ps (take ps 10)))
       (if (or (= i 11) (null? ps))
           #t
           (begin
-            (draw-text-simple
+            (draw-text
+             font
              (str i ". (" (caar ps) ") " (cadar ps))
              (list 5 (+ 5 (* i 18)))
              16
+             0
              (if (string=? (cadar ps) player-name) red black))
             (loop (+ 1 i) (cdr ps)))))))
 
@@ -135,79 +139,81 @@
 
   (with-window
    *window-size* *window-size* "*lager*"
-   (let loop ((x 0)
-              (y 0)
-              (points #n)
-              (size 0)
-              (zoom 1.0)
-              (speed-mult 2.0)
-              (players ())
-              (frame-ctr 0)
+   (let ()
+     (initialize-default-assets)
+     (let loop ((x 0)
+                (y 0)
+                (points #n)
+                (size 0)
+                (zoom 1.0)
+                (speed-mult 2.0)
+                (players ())
+                (frame-ctr 0)
+                )
+       (lets ((mailq (get-mailq))
+              (mp (map (λ (v) (remap v 0 *window-size* -1 1)) (mouse-pos)))
+              (x y (values
+                    (+ x (* speed-mult *speed-base* (car mp)))
+                    (+ y (* speed-mult *speed-base* (cadr mp)))))
+              (pos (list x y))
+              (camera (list *cam-offset* pos 0 zoom))
+              ;; update data based on mailq
+              (points (update-points points mailq))
+              (size (let ((msgs (mesgof 'set-size! mailq)))
+                      (if (null? msgs)
+                          size
+                          (ref (last msgs 'bug) 2))))
+              (death-note (mesgof 'kill! mailq))
+              (players (filter (λ (p) (not (killed? death-note (car p)))) players))
+              (players (let loop ((msgs (mesgof 'set-pos-of! mailq)) (players players))
+                         (cond
+                          ((null? msgs) players)
+                          ((assoc (car (ref (car msgs) 2)) players) ;; player exists in mem, change data
+                           (loop (cdr msgs) (edit-player players (ref (car msgs) 2) (λ (pl) (ref (car msgs) 2)))))
+                          (else
+                           (loop (cdr msgs) (append players (list (ref (car msgs) 2))))))))
               )
-     (lets ((mailq (get-mailq))
-            (mp (map (λ (v) (remap v 0 *window-size* -1 1)) (mouse-pos)))
-            (x y (values
-                  (+ x (* speed-mult *speed-base* (car mp)))
-                  (+ y (* speed-mult *speed-base* (cadr mp)))))
-            (pos (list x y))
-            (camera (list *cam-offset* pos 0 zoom))
-            ;; update data based on mailq
-            (points (update-points points mailq))
-            (size (let ((msgs (mesgof 'set-size! mailq)))
-                    (if (null? msgs)
-                        size
-                        (ref (last msgs 'bug) 2))))
-            (death-note (mesgof 'kill! mailq))
-            (dnames (map car players))
-            (players (filter (λ (p) (not (killed? death-note (car p)))) players))
-            (players (let loop ((msgs (mesgof 'set-pos-of! mailq)) (players players))
-                       (cond
-                        ((null? msgs) players)
-                        ((assoc (car (ref (car msgs) 2)) players) ;; player exists in mem, change data
-                         (loop (cdr msgs) (edit-player players (ref (car msgs) 2) (λ (pl) (ref (car msgs) 2)))))
-                        (else
-                         (loop (cdr msgs) (append players (list (ref (car msgs) 2))))))))
-            )
 
-       (when (not (null? death-note))
-         (print "death-note: " death-note))
+         (when (not (null? death-note))
+           (print "death-note: " death-note))
 
-       (when (killed? death-note player-name)
-         (print 'died)
-         (halt 0))
+         (when (killed? death-note player-name)
+           (print 'died)
+           (halt 0))
 
-       ;; ask the decider to update location every n frames or if i think a a point was touched
-       (when (or (any (λ (pt) (collision-circles? pt *point-radius* pos size)) points) (= frame-ctr 0))
-         (mail 'decider (tuple 'update-pos! pos)))
+         ;; ask the decider to update location every n frames or if i think a a point was touched
+         (when (or (any (λ (pt) (collision-circles? pt *point-radius* pos size)) points) (= frame-ctr 0))
+           (mail 'decider (tuple 'update-pos! pos)))
 
-       (draw
-        (clear-background gray)
-        (with-camera2d
-         camera
-         (begin
-           (draw-grid)
-           (for-each (λ (pos) (draw-circle pos *point-radius* green)) points)
-           (draw-player pos size red player-name)
-           (for-each (λ (pl) (draw-player (lref pl 3) (lref pl 2) blue (car pl))) players)
-           ))
-        (draw-map pos size points players)
-        (draw-leaderboard size player-name players)
-        (draw-fps 0 0)
-        )
-       (if (window-should-close?)
-           0
-           (loop
-            x
-            y
-            points
-            size
-            (+ zoom (* 0.01 (mouse-wheel)))
-            speed-mult
-            players
-            (modulo (+ frame-ctr 1) *frames-per-pos*)))))))
+         (draw
+          (clear-background gray)
+          (with-camera2d
+           camera
+           (begin
+             (draw-grid)
+             (for-each (λ (pos) (draw-circle pos *point-radius* green)) points)
+             (draw-player pos size red player-name)
+             (for-each (λ (pl) (draw-player (lref pl 3) (lref pl 2) blue (car pl))) players)
+             ))
+          (draw-map pos size points players)
+          (draw-leaderboard size player-name players)
+          (draw-fps 0 0)
+          )
+         (if (window-should-close?)
+             0
+             (loop
+              x
+              y
+              points
+              size
+              (+ zoom (* 0.01 (mouse-wheel)))
+              speed-mult
+              players
+              (modulo (+ frame-ctr 1) *frames-per-pos*))))))))
 
 (λ (_)
   (thread 'decider (decider))
   (start-player-adder)
+  (start-asset-handler)
   (thread 'threadmain (lager "local player" 'threadmain))
   (ref (wait-mail) 2))
