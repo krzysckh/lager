@@ -215,15 +215,32 @@
                               #f
                               target))
                   (target (if target target (bot-find-target (list x y) points)))
-                  (pos (vec2move-towards (list x y) target 8)))
+                  (pos (vec2move-towards (list x y) target 15)))
              (mail 'decider (tuple 'update-pos! pos))
              (next-thread)
-             (sleep 80)
+             (sleep 150)
              (loop points (car pos) (cadr pos) target)))))
       #f))
 
+(define (draw-leaderboard player-size player-name players)
+  (let ((ps (sort (λ (a b) (> (car a) (car b)))
+                  (append (map (λ (p) (list (lref p 2) (car p))) players) (list (list player-size player-name))))))
+    (let loop ((i 1) (ps (take ps 10)))
+      (if (or (= i 11) (null? ps))
+          #t
+          (begin
+            (draw-text-simple
+             (str i ". (" (caar ps) ") " (cadar ps))
+             (list 5 (+ 5 (* i 18)))
+             16
+             (if (string=? (cadar ps) player-name) red black))
+            (loop (+ 1 i) (cdr ps)))))))
+
 (define (lager player-name thrname)
   (set-target-fps! 60)
+  ;; TODO: figure this out as in local player mode it **will block** and decider will be slowed down
+  ;; figure out = add delta time to compensate lower frame rates and don't give unfair advantage to higher frame rates
+
   (tuple-case (add-player player-name thrname)
     ((error why)
      (error "couldn't add player to the game: " why))
@@ -233,7 +250,7 @@
   (thread (let loop ((i 0))
             (if (= i 10)
                 #t
-                (let ((name (string-append "bot" (number->string i))))
+                (let ((name (string-append "local-bot@" (number->string i))))
                   (make-bot name (string->symbol name) (seed->rands (time-ns)))
                   (sleep 10)
                   (loop (+ 1 i))))))
@@ -293,6 +310,7 @@
            (for-each (λ (pl) (draw-player (lref pl 3) (lref pl 2) blue (car pl))) players)
            ))
         (draw-map pos size points players)
+        (draw-leaderboard size player-name players)
         (draw-fps 0 0)
         )
        (if (window-should-close?)
