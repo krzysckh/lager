@@ -23,5 +23,5 @@ lager: lager.c
 clean:
 	rm -f lager lager.exe *.c
 packup: lager.exe
-	mkdir build
+	mkdir -p build
 	cp -v lager.exe build
