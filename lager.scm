@@ -37,18 +37,28 @@
 
 (define (remap-point-to-map map-box pt)
   (list
-   (remap (car pt)  (- 0 *map-size*)  *map-size*  (car map-box)  (+ (car map-box) map:sz))
+   (remap (car pt)  (- 0 *map-size*) *map-size* (car map-box)  (+ (car map-box)  map:sz))
    (remap (cadr pt) (- 0 *map-size*) *map-size* (cadr map-box) (+ (cadr map-box) map:sz))))
 
-(define (draw-map pos points size)
+(define (remap-size-to-map size)
+  (max 2 (round (remap size 0 (* 2 *map-size*) 0 map:sz))))
+
+(define (draw-map pos size points players)
   (let* ((map-box (list (- *window-size* map:pad map:sz) map:pad map:sz map:sz))
-         (user (remap-point-to-map map-box pos)))
+         (user (remap-point-to-map map-box pos))
+         (players (map (λ (pl) (append
+                                (list (remap-size-to-map (lref pl 2)))
+                                (remap-point-to-map map-box (lref pl 3)))) players)))
     (draw-rectangle map-box (make-color 255 255 255 128))
     (draw-rectangle-lines map-box 4 black)
     (for-each
      (λ (pt) (draw-circle (remap-point-to-map map-box pt) 2 green))
      points)
-    (draw-circle user (max 2 (round (remap size 0 (* 2 *map-size*) 0 map:sz))) red)
+    (for-each
+     (λ (pl) (draw-circle (cdr pl) (car pl) blue))
+     players)
+
+    (draw-circle user (remap-size-to-map size) red)
     ))
 
 ;; rs min max → rs (x y)
@@ -178,8 +188,8 @@
           acc))))
 
 (define (update-points old-points mailq)
-  (let ((points (fold (λ (acc pt) (filter (λ (x) (not (equal? x pt))) acc)) old-points (map (C ref 2) (mesgof 'del! mailq)))))
-    (append points (map (C ref 2) (mesgof 'add! mailq)))))
+  (let ((del (map (C ref 2) (mesgof 'del! mailq))))
+    (filter (λ (x) (not (has? del x))) (append old-points (map (C ref 2) (mesgof 'add! mailq))))))
 
 (define (bot-find-target pos points)
   (cdar (sort (λ (a b) (< (car a) (car b))) (zip cons (map floor (map (C vec2dist pos) points)) points))))
@@ -198,11 +208,16 @@
    (let ()
      (mail 'decider (tuple 'update-pos! (list 0 0)))
      (let loop ((points #n) (x 0) (y 0) (target #f))
-       (lets ((mailq (get-mailq))
+       (let* ((mailq (get-mailq))
               (points (update-points points mailq))
-              (target (if (or (> (len (mesgof 'set-size! mailq)) 0) (> (len (mesgof 'del! mailq)) 0)) #f target))
+              (target (if (or (> (len (mesgof 'set-size! mailq)) 0)
+                              (> (len (mesgof 'del! mailq)) 0)
+                              (> (len (mesgof 'add! mailq)) 0)
+                              (equal? target (list x y)))
+                          #f
+                          target))
               (target (if target target (bot-find-target (list x y) points)))
-              (pos (vec2move-towards (list x y) target 3)))
+              (pos (vec2move-towards (list x y) target 5)))
          (mail 'decider (tuple 'update-pos! pos))
          (sleep 10)
          (loop points (car pos) (cadr pos) target)))))
@@ -248,13 +263,8 @@
        (when (or (any (λ (pt) (collision-circles? pt *point-radius* pos size)) points) (= frame-ctr 0))
          (mail 'decider (tuple 'update-pos! pos)))
 
-       ;; (when (key-down? key-equal)
-       ;;   (let loop ((i 0))
-       ;;     (if (= i 10)
-       ;;         #n
-       ;;         (let ()
-       ;;           (print (mail 'threadmain (tuple 'enlarge!)))
-       ;;           (loop (+ 1 i))))))
+       (when (key-down? key-equal)
+         (mail thrname (tuple 'set-size! 1000)))
 
        (draw
         (clear-background gray)
@@ -266,7 +276,7 @@
            (draw-player pos size red player-name)
            (for-each (λ (pl) (draw-player (lref pl 3) (lref pl 2) blue (car pl))) players)
            ))
-        (draw-map pos points size)
+        (draw-map pos size points players)
         (draw-fps 0 0)
         )
        (if (window-should-close?)
