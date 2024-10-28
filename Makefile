@@ -21,7 +21,7 @@ lager.c: lager.scm
 lager-bin: lager.c
 	$(CC) -o lager-bin lager.c $(CFLAGS) $(LDFLAGS)
 clean:
-	rm -f lager lager.exe *.c
+	rm -f lager-bin lager.exe *.c
 packup: lager.exe
 	mkdir -p build
 	cp -v lager.exe build
