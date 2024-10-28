@@ -190,12 +190,9 @@
            (loop)
            #t))
      (let loop ((x 0))
-       (lets ((a b (next-mail)))
-         (print "[bot sigma] " a ": " b)
-         (mail 'decider (tuple 'update-pos! (list x 0)))
-         (next-thread)
-         (print "bots after next-thread")
-         (loop (+ x 3))))))
+       (mail 'decider (tuple 'update-pos! (list x 0)))
+       (sleep 100)
+       (loop (+ x 1)))))
 
   (with-window
    *window-size* *window-size* "*lager*"
