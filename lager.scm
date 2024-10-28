@@ -94,6 +94,11 @@
      (else
       (loop (append acc (list (car players))) (cdr players))))))
 
+(define (lset* l where what)
+  (if (>= where (len l))
+      (append l (list what))
+      (lset l where what)))
+
 ;; meant to be ran over the network
 (define (decider)
   (lets ((min (- 0 *map-size*))
@@ -128,28 +133,53 @@
                (print "Couldn't find " who player)
                (halt 1)) ;; TODO: don't halt, make sure this never happens
 
-             (for-each (λ (p) (mail (lref p 1) (tuple 'set-pos-of! (append (car player) (list pos)))))
-                       (filter (λ (x) (not (equal? (car player) x))) players))
+             (for-each
+              (λ (p) (mail (lref p 1) (tuple 'set-pos-of! (append (car player) (list pos)))))
+              (filter (λ (x) (not (equal? (car player) x))) players))
 
-             (lets ((collided rest (let loop ((cacc #n) (racc #n) (pts points))
+             (lets ((psz (lref (car player) 2))
+                    (psz deleted (let loop ((players players) (acc 0) (deleted #n)) ;; check for collided players
+                                   (let ((p (car* players)))
                                      (cond
-                                      ((null? pts) (values cacc racc))
-                                      ((collision-circles? (car pts) *point-radius* pos (lref (car player) 2))
-                                       (mail who (tuple 'set-size! (+ (lref (car player) 2) 1)))
-                                       (print who ": sized " (+ (lref (car player) 2) 1))
-                                       (mail* (player-threads players) (tuple 'del! (car pts)))
-                                       (loop (append cacc (list (car pts))) racc (cdr pts)))
+                                      ((null? players) (values (+ psz acc) deleted))
+                                      ((equal? (lref p 1) who) (loop (cdr players) acc deleted))
+                                      ((> (len p) 3)
+                                       (if (collision-circles? pos psz (lref p 3) (lref p 2))
+                                           (cond
+                                            ((> psz (lref p 2))
+                                             (loop (cdr players) (+ acc (lref p 2)) (append deleted (list p))))
+                                            ((< psz (lref p 2))
+                                             (loop (cdr players) 0 (append deleted (list (car player)))))
+                                            (else
+                                             (loop (cdr players) acc deleted)))
+                                           (loop (cdr players) acc deleted)))
                                       (else
-                                       (loop cacc (append racc (list (car pts))) (cdr pts)))))))
-               (let L ((rs rs) (acc #n) (p collided))
-                 (if (null? p)
-                     (loop (if (null? collided)
-                               players
-                               (edit-player players (car player) (λ (pl) (lset pl 2 (+ (lref pl 2) 1)))))
-                           (append rest acc) rs)
-                     (lets ((rs pt (random-point rs min max)))
-                       (mail* (player-threads players) (tuple 'add! pt))
-                       (L rs (append acc (list pt)) (cdr p))))))))
+                                       (loop (cdr players) acc deleted)))))))
+               (for-each
+                (λ (t) (for-each (λ (p) (mail (lref t 1) (tuple 'kill! p))) deleted))
+                players)
+
+               (let ((players (filter (λ (p) (not (has? (map car deleted) (car p)))) players)))
+                 ;; check for collided points
+                 (lets ((collided rest (let loop ((cacc #n) (racc #n) (pts points))
+                                         (cond
+                                          ((null? pts) (values cacc racc))
+                                          ((collision-circles? (car pts) *point-radius* pos (lref (car player) 2))
+                                           (mail who (tuple 'set-size! (+ (lref (car player) 2) 1)))
+                                           (print who ": sized " (+ (lref (car player) 2) 1))
+                                           (mail* (player-threads players) (tuple 'del! (car pts)))
+                                           (loop (append cacc (list (car pts))) racc (cdr pts)))
+                                          (else
+                                           (loop cacc (append racc (list (car pts))) (cdr pts)))))))
+                   (let L ((rs rs) (acc #n) (p collided))
+                     (if (null? p)
+                         (loop (if (null? collided)
+                                   (edit-player players (car player) (λ (pl) (lset* pl 3 pos)))
+                                   (edit-player players (car player) (λ (pl) (lset* (lset pl 2 (+ psz 1)) 3 pos))))
+                               (append rest acc) rs)
+                         (lets ((rs pt (random-point rs min max)))
+                           (mail* (player-threads players) (tuple 'add! pt))
+                           (L rs (append acc (list pt)) (cdr p))))))))))
           (else
            (print "shid, invalid-message " m)
            ;; (mail who (tuple 'invalid-message))
@@ -180,6 +210,9 @@
   (syntax-rules (interact)
     ((add-player name threadname)
      (interact 'add-player (tuple name threadname)))))
+
+(define (killed? l player-name)
+  (has? (map (λ (t) (lref (ref t 2) 0)) l) player-name))
 
 (define (get-mailq)
   (let loop ((acc #n))
@@ -215,11 +248,15 @@
                               #f
                               target))
                   (target (if target target (bot-find-target (list x y) points)))
-                  (pos (vec2move-towards (list x y) target 15)))
-             (mail 'decider (tuple 'update-pos! pos))
-             (next-thread)
-             (sleep 150)
-             (loop points (car pos) (cadr pos) target)))))
+                  (pos (vec2move-towards (list x y) target 15))
+                  (death-note (mesgof 'kill! mailq)))
+             (if (killed? death-note name)
+                 #t
+                 (let ()
+                   (mail 'decider (tuple 'update-pos! pos))
+                   (next-thread)
+                   (sleep 150)
+                   (loop points (car pos) (cadr pos) target)))))))
       #f))
 
 (define (draw-leaderboard player-size player-name players)
@@ -267,10 +304,6 @@
               (frame-ctr 0)
               )
      (lets ((mailq (get-mailq))
-            ;; (x (if (key-down? key-a) (- x (* speed-mult *speed-base*)) x))
-            ;; (x (if (key-down? key-d) (+ x (* speed-mult *speed-base*)) x))
-            ;; (y (if (key-down? key-w) (- y (* speed-mult *speed-base*)) y))
-            ;; (y (if (key-down? key-s) (+ y (* speed-mult *speed-base*)) y))
             (mp (map (λ (v) (remap v 0 *window-size* -1 1)) (mouse-pos)))
             (x y (values
                   (+ x (* speed-mult *speed-base* (car mp)))
@@ -283,6 +316,9 @@
                     (if (null? msgs)
                         size
                         (ref (last msgs 'bug) 2))))
+            (death-note (mesgof 'kill! mailq))
+            (dnames (map car players))
+            (players (filter (λ (p) (not (killed? death-note (car p)))) players))
             (players (let loop ((msgs (mesgof 'set-pos-of! mailq)) (players players))
                        (cond
                         ((null? msgs) players)
@@ -292,12 +328,16 @@
                          (loop (cdr msgs) (append players (list (ref (car msgs) 2))))))))
             )
 
+       (when (not (null? death-note))
+         (print "death-note: " death-note))
+
+       (when (killed? death-note player-name)
+         (print 'died)
+         (halt 0))
+
        ;; ask the decider to update location every n frames or if i think a a point was touched
        (when (or (any (λ (pt) (collision-circles? pt *point-radius* pos size)) points) (= frame-ctr 0))
          (mail 'decider (tuple 'update-pos! pos)))
-
-       (when (key-down? key-equal)
-         (mail thrname (tuple 'set-size! 1000)))
 
        (draw
         (clear-background gray)
