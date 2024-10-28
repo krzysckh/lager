@@ -18,8 +18,8 @@ lager.exe: lager-win.c libraylib5-winlegacy.a
 	i686-w64-mingw32-gcc -static -o lager.exe -I/usr/local/include lager-win.c -L. -l:libraylib5-winlegacy.a -lm -lopengl32 -lwinmm -lgdi32 -lws2_32
 lager.c: lager.scm
 	ol-rl $(OLFLAGS) -o lager.c lager.scm
-lager: lager.c
-	$(CC) -o lager lager.c $(CFLAGS) $(LDFLAGS)
+lager-bin: lager.c
+	$(CC) -o lager-bin lager.c $(CFLAGS) $(LDFLAGS)
 clean:
 	rm -f lager lager.exe *.c
 packup: lager.exe
