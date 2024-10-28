@@ -136,6 +136,7 @@
                                       ((null? pts) (values cacc racc))
                                       ((collision-circles? (car pts) *point-radius* pos (lref (car player) 2))
                                        (mail who (tuple 'set-size! (+ (lref (car player) 2) 1)))
+                                       (print who ": sized " (+ (lref (car player) 2) 1))
                                        (mail* (player-threads players) (tuple 'del! (car pts)))
                                        (loop (append cacc (list (car pts))) racc (cdr pts)))
                                       (else
@@ -194,6 +195,33 @@
 (define (bot-find-target pos points)
   (cdar (sort (λ (a b) (< (car a) (car b))) (zip cons (map floor (map (C vec2dist pos) points)) points))))
 
+(define (make-bot name thrid rs)
+  (if (add-player name thrid)
+      (thread
+       thrid
+       (lets ((rs shid (rand-range rs 21 37))
+              (rs bx (rand-range rs 0 (* 2 *map-size*)))
+              (rs by (rand-range rs 0 (* 2 *map-size*)))
+              (bx (- bx *map-size*))
+              (by (- by *map-size*)))
+         (mail 'decider (tuple 'update-pos! (list bx by)))
+         (let loop ((points #n) (x bx) (y by) (target #f))
+           (let* ((mailq (get-mailq))
+                  (points (update-points points mailq))
+                  (target (if (or (> (len (mesgof 'set-size! mailq)) 0)
+                                  (> (len (mesgof 'del! mailq)) 0)
+                                  (> (len (mesgof 'add! mailq)) 0)
+                                  (equal? target (list x y)))
+                              #f
+                              target))
+                  (target (if target target (bot-find-target (list x y) points)))
+                  (pos (vec2move-towards (list x y) target 8)))
+             (mail 'decider (tuple 'update-pos! pos))
+             (next-thread)
+             (sleep 80)
+             (loop points (car pos) (cadr pos) target)))))
+      #f))
+
 (define (lager player-name thrname)
   (set-target-fps! 60)
   (tuple-case (add-player player-name thrname)
@@ -202,25 +230,13 @@
     (else
      #t))
 
-  (print "bots?: " (add-player "bot test" 'bots))
-  (thread
-   'bots
-   (let ()
-     (mail 'decider (tuple 'update-pos! (list 0 0)))
-     (let loop ((points #n) (x 0) (y 0) (target #f))
-       (let* ((mailq (get-mailq))
-              (points (update-points points mailq))
-              (target (if (or (> (len (mesgof 'set-size! mailq)) 0)
-                              (> (len (mesgof 'del! mailq)) 0)
-                              (> (len (mesgof 'add! mailq)) 0)
-                              (equal? target (list x y)))
-                          #f
-                          target))
-              (target (if target target (bot-find-target (list x y) points)))
-              (pos (vec2move-towards (list x y) target 5)))
-         (mail 'decider (tuple 'update-pos! pos))
-         (sleep 10)
-         (loop points (car pos) (cadr pos) target)))))
+  (thread (let loop ((i 0))
+            (if (= i 10)
+                #t
+                (let ((name (string-append "bot" (number->string i))))
+                  (make-bot name (string->symbol name) (seed->rands (time-ns)))
+                  (sleep 10)
+                  (loop (+ 1 i))))))
 
   (with-window
    *window-size* *window-size* "*lager*"
