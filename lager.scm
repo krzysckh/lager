@@ -97,7 +97,7 @@
     (print "decider ready")
     (let loop ((players #n) (points points) (rs rs))
       (lets ((who m (next-mail)))
-        (print "who: " who ", m: " m)
+        ;; (print "who: " who ", m: " m)
         (tuple-case m
           ((add-player! name thread) ;; TODO: check if a player can be added
            (print "add-player!: will send data to " thread ", who=" who)
@@ -170,6 +170,20 @@
     ((add-player name threadname)
      (interact 'add-player (tuple name threadname)))))
 
+(define (get-mailq)
+  (let loop ((acc #n))
+    (lets ((_ v (maybe-next-mail)))
+      (if v
+          (loop (append acc (list v)))
+          acc))))
+
+(define (update-points old-points mailq)
+  (let ((points (fold (λ (acc pt) (filter (λ (x) (not (equal? x pt))) acc)) old-points (map (C ref 2) (mesgof 'del! mailq)))))
+    (append points (map (C ref 2) (mesgof 'add! mailq)))))
+
+(define (bot-find-target pos points)
+  (cdar (sort (λ (a b) (< (car a) (car b))) (zip cons (map floor (map (C vec2dist pos) points)) points))))
+
 (define (lager player-name thrname)
   (set-target-fps! 60)
   (tuple-case (add-player player-name thrname)
@@ -183,16 +197,15 @@
    'bots
    (let ()
      (mail 'decider (tuple 'update-pos! (list 0 0)))
-     (wait-mail)
-     (let loop ()
-       (print "bots: skipping: " (check-mail))
-       (if (check-mail)
-           (loop)
-           #t))
-     (let loop ((x 0))
-       (mail 'decider (tuple 'update-pos! (list x 0)))
-       (sleep 100)
-       (loop (+ x 1)))))
+     (let loop ((points #n) (x 0) (y 0) (target #f))
+       (lets ((mailq (get-mailq))
+              (points (update-points points mailq))
+              (target (if (or (> (len (mesgof 'set-size! mailq)) 0) (> (len (mesgof 'del! mailq)) 0)) #f target))
+              (target (if target target (bot-find-target (list x y) points)))
+              (pos (vec2move-towards (list x y) target 3)))
+         (mail 'decider (tuple 'update-pos! pos))
+         (sleep 10)
+         (loop points (car pos) (cadr pos) target)))))
 
   (with-window
    *window-size* *window-size* "*lager*"
@@ -205,11 +218,7 @@
               (players ())
               (frame-ctr 0)
               )
-     (lets ((mailq (let loop ((acc #n))
-                     (lets ((_ v (maybe-next-mail)))
-                       (if v
-                           (loop (append acc (list v)))
-                           acc))))
+     (lets ((mailq (get-mailq))
             ;; (x (if (key-down? key-a) (- x (* speed-mult *speed-base*)) x))
             ;; (x (if (key-down? key-d) (+ x (* speed-mult *speed-base*)) x))
             ;; (y (if (key-down? key-w) (- y (* speed-mult *speed-base*)) y))
@@ -221,8 +230,7 @@
             (pos (list x y))
             (camera (list *cam-offset* pos 0 zoom))
             ;; update data based on mailq
-            (points (fold (λ (acc pt) (filter (λ (x) (not (equal? x pt))) acc)) points (map (C ref 2) (mesgof 'del! mailq))))
-            (points (append points (map (C ref 2) (mesgof 'add! mailq))))
+            (points (update-points points mailq))
             (size (let ((msgs (mesgof 'set-size! mailq)))
                     (if (null? msgs)
                         size
