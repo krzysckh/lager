@@ -25,3 +25,5 @@ clean:
 packup: lager.exe
 	mkdir -p build
 	cp -v lager.exe build
+pubcpy: lager.exe
+	yes | pubcpy tmp lager.exe
