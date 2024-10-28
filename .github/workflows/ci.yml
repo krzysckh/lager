@@ -1,0 +1,39 @@
+name: build lager
+on: push
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+      - name: Setup MinGW
+        uses: egor-tensin/setup-mingw@v2
+        with:
+          platform: any
+      - name: Setup Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 3.1.6
+          actions-cache-folder: 'emsdk-cache'
+      - name: Download stuff from apt
+        shell: bash
+        run: |
+          sudo add-apt-repository universe
+          sudo dpkg --add-architecture i386
+          sudo apt update
+          sudo apt install -y wine wine32
+      - name: Setup raylib
+        shell: bash
+        run: |
+          sudo curl -o /usr/local/include/raylib.h  https://raw.githubusercontent.com/raysan5/raylib/f1007554a0a8145060797c0aa8169bdaf2c1c6b8/src/raylib.h
+          sudo curl -o /usr/local/include/raymath.h https://raw.githubusercontent.com/raysan5/raylib/f1007554a0a8145060797c0aa8169bdaf2c1c6b8/src/raymath.h
+      - name: Build lager
+        shell: bash
+        run: |
+          ./build.sh
+      - name: Upload as artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: slgj-2024
+          path: build/
