@@ -39,7 +39,9 @@
     (define asset get-asset)
 
     (define (initialize-default-assets)
-      (add-asset 'font (bytevector->font font".otf" 32 1024))
+      (add-asset 'font (bytevector->font font".otf" 16 1024))
+      (add-asset 'font32 (bytevector->font font".otf" 32 1024))
+      (add-asset 'font64 (bytevector->font font".otf" 64 1024))
       )
 
     ))
