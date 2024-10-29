@@ -30,8 +30,9 @@ packup: lager.exe lager-server.exe
 	mkdir -p build
 	cp -v lager.exe build
 	cp -v lager-server.exe build
-pubcpy: lager.exe
+pubcpy: lager.exe lager-server.exe
 	yes | pubcpy tmp lager.exe
+	yes | pubcpy tmp lager-server.exe
 test:
 	ol-rl -r lager-server.scm & ( sleep 1 ; ol-rl -r lager.scm "local player" localhost )
 win-test: lager.exe lager-server.exe
