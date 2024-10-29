@@ -1,5 +1,6 @@
 (import
  (owl toplevel)
+ (prefix (owl sys) sys/)
  (raylib)
  (lager const)
  (lager decider)
@@ -131,14 +132,6 @@
 
   (mail 'decider (tuple 'add-player! player-name thrname))
 
-  ;; (thread (let loop ((i 0))
-  ;;           (if (= i 10)
-  ;;               #t
-  ;;               (let ((name (string-append "local-bot@" (number->string i))))
-  ;;                 (make-bot name (string->symbol name) (seed->rands (time-ns)))
-  ;;                 (sleep 10)
-  ;;                 (loop (+ 1 i))))))
-
   (with-window
    *window-size* *window-size* "*lager*"
    (let ()
@@ -213,8 +206,8 @@
               players
               (modulo (+ frame-ctr 1) *frames-per-pos*))))))))
 
-(define (connect-to-decider player-thread)
-  (let* ((con (open-connection (bytevector 127 0 0 1) *port*))
+(define (connect-to-decider player-thread ip)
+  (let* ((con (open-connection (sys/resolve-host ip) *port*))
          (bs (port->byte-stream con)))
     (print "[networked decider] con: " con)
     (thread
@@ -233,9 +226,21 @@
           (write-bytes con fasl)
           (loop))))))
 
-(λ (_)
-  (thread 'decider (connect-to-decider 'threadmain))
-  (start-player-adder)
-  (start-asset-handler)
-  (thread 'threadmain (lager "local player" 'threadmain))
-  0)
+(λ (args)
+  (let ((name (if (> (len args) 1) (lref args 1) "local player")))
+    (if (= (len args) 3)
+        (thread 'decider (connect-to-decider 'threadmain (lref args 2)))
+        (let ()
+          (start-player-adder)
+          (thread (let loop ((i 0))
+                    (if (= i 10)
+                        #t
+                        (let ((name (string-append "local-bot@" (number->string i))))
+                          (make-bot name (string->symbol name) (seed->rands (time-ns)))
+                          (sleep 10)
+                          (loop (+ 1 i))))))
+
+          (thread 'decider (decider))))
+    (start-asset-handler)
+    (thread 'threadmain (lager name 'threadmain))
+    0))
