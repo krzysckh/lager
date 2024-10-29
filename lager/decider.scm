@@ -24,7 +24,7 @@
         (print "decider ready")
         (let loop ((players #n) (points points) (rs rs))
           (lets ((who m (next-mail)))
-            ;; (print "who: " who ", m: " m)
+            (print "who: " who ", m: " m)
             (tuple-case m
               ((add-player! name thread) ;; TODO: check if a player can be added
                (print "add-player!: will send data to " thread ", who=" who)

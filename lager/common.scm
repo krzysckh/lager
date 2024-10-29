@@ -15,6 +15,9 @@
    random-point
    random-points
    edit-player
+   u16->n
+   n->u16
+   reintern
    )
 
   (begin
@@ -75,5 +78,11 @@
           (loop (append acc (list (f (car players)))) (cdr players)))
          (else
           (loop (append acc (list (car players))) (cdr players))))))
+
+    (define (u16->n l) (bior (<< (car l) 8) (cadr l)))
+    (define (n->u16 n) (list (band n #xff00) (band n #xff)))
+
+    (define (reintern tuple)
+      (list->tuple (map (λ (x) (if (symbol? x) (string->symbol (symbol->string x)) x)) (tuple->list tuple))))
 
     ))

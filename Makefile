@@ -27,3 +27,5 @@ packup: lager.exe
 	cp -v lager.exe build
 pubcpy: lager.exe
 	yes | pubcpy tmp lager.exe
+test:
+	ol-rl -r lager-server.scm & ( sleep 1 ; ol-rl -r lager.scm )

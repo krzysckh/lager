@@ -123,19 +123,21 @@
   ;; TODO: figure this out as in local player mode it **will block** and decider will be slowed down
   ;; figure out = add delta time to compensate lower frame rates and don't give unfair advantage to higher frame rates
 
-  (tuple-case (add-player player-name thrname)
-    ((error why)
-     (error "couldn't add player to the game: " why))
-    (else
-     #t))
+  ;; (tuple-case (add-player player-name thrname)
+  ;;   ((error why)
+  ;;    (error "couldn't add player to the game: " why))
+  ;;   (else
+  ;;    #t))
 
-  (thread (let loop ((i 0))
-            (if (= i 10)
-                #t
-                (let ((name (string-append "local-bot@" (number->string i))))
-                  (make-bot name (string->symbol name) (seed->rands (time-ns)))
-                  (sleep 10)
-                  (loop (+ 1 i))))))
+  (mail 'decider (tuple 'add-player! player-name thrname))
+
+  ;; (thread (let loop ((i 0))
+  ;;           (if (= i 10)
+  ;;               #t
+  ;;               (let ((name (string-append "local-bot@" (number->string i))))
+  ;;                 (make-bot name (string->symbol name) (seed->rands (time-ns)))
+  ;;                 (sleep 10)
+  ;;                 (loop (+ 1 i))))))
 
   (with-window
    *window-size* *window-size* "*lager*"
@@ -211,9 +213,29 @@
               players
               (modulo (+ frame-ctr 1) *frames-per-pos*))))))))
 
+(define (connect-to-decider player-thread)
+  (let* ((con (open-connection (bytevector 127 0 0 1) *port*))
+         (bs (port->byte-stream con)))
+    (print "[networked decider] con: " con)
+    (thread
+     (let loop ()
+       (when-readable con)
+       (let* ((size (u16->n (bytevector->list (try-get-block con 2 #f))))
+              (b (bytevector->list (try-get-block con size #t)))
+              (v (reintern (fasl-decode b (tuple 'bad)))))
+         (mail player-thread v)
+         (loop))))
+
+    (let loop ()
+      (lets ((who v (next-mail)))
+        (let ((fasl (fasl-encode v)))
+          (write-bytes con (n->u16 (len fasl)))
+          (write-bytes con fasl)
+          (loop))))))
+
 (λ (_)
-  (thread 'decider (decider))
+  (thread 'decider (connect-to-decider 'threadmain))
   (start-player-adder)
   (start-asset-handler)
   (thread 'threadmain (lager "local player" 'threadmain))
-  (ref (wait-mail) 2))
+  0)
