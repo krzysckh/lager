@@ -18,6 +18,7 @@
    u16->n
    n->u16
    reintern
+   die
    )
 
   (begin
@@ -84,5 +85,9 @@
 
     (define (reintern tuple)
       (list->tuple (map (λ (x) (if (symbol? x) (string->symbol (symbol->string x)) x)) (tuple->list tuple))))
+
+    (define (die)
+      (close-window)
+      (catch-thread '_))
 
     ))

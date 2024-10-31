@@ -120,7 +120,6 @@
             (loop (+ 1 i) (cdr ps)))))))
 
 (define (lager player-name thrname)
-  (set-target-fps! 60)
   ;; TODO: figure this out as in local player mode it **will block** and decider will be slowed down
   ;; figure out = add delta time to compensate lower frame rates and don't give unfair advantage to higher frame rates
 
@@ -132,79 +131,76 @@
 
   (mail 'decider (tuple 'add-player! player-name thrname))
 
-  (with-window
-   *window-size* *window-size* "*lager*"
-   (let ()
-     (initialize-default-assets)
-     (let loop ((x 0)
-                (y 0)
-                (points #n)
-                (size 0)
-                (zoom 1.0)
-                (speed-mult 2.0)
-                (players ())
-                (frame-ctr 0)
-                )
-       (lets ((mailq (get-mailq))
-              (mp (map (λ (v) (remap v 0 *window-size* -1 1)) (mouse-pos)))
-              (x y (values
-                    (+ x (* speed-mult *speed-base* (car mp)))
-                    (+ y (* speed-mult *speed-base* (cadr mp)))))
-              (pos (list x y))
-              (camera (list *cam-offset* pos 0 zoom))
-              ;; update data based on mailq
-              (points (update-points points mailq))
-              (size (let ((msgs (mesgof 'set-size! mailq)))
-                      (if (null? msgs)
-                          size
-                          (ref (last msgs 'bug) 2))))
-              (death-note (mesgof 'kill! mailq))
-              (players (filter (λ (p) (not (killed? death-note (car p)))) players))
-              (players (let loop ((msgs (mesgof 'set-pos-of! mailq)) (players players))
-                         (cond
-                          ((null? msgs) players)
-                          ((assoc (car (ref (car msgs) 2)) players) ;; player exists in mem, change data
-                           (loop (cdr msgs) (edit-player players (ref (car msgs) 2) (λ (pl) (ref (car msgs) 2)))))
-                          (else
-                           (loop (cdr msgs) (append players (list (ref (car msgs) 2))))))))
-              )
+  (let loop ((x 0)
+             (y 0)
+             (points #n)
+             (size 0)
+             (zoom 1.0)
+             (speed-mult 2.0)
+             (players ())
+             (frame-ctr 0)
+             )
+    (lets ((mailq (get-mailq))
+           (mp (map (λ (v) (remap v 0 *window-size* -1 1)) (mouse-pos)))
+           (x y (values
+                 (+ x (* speed-mult *speed-base* (car mp)))
+                 (+ y (* speed-mult *speed-base* (cadr mp)))))
+           (pos (list x y))
+           (camera (list *cam-offset* pos 0 zoom))
+           ;; update data based on mailq
+           (points (update-points points mailq))
+           (size (let ((msgs (mesgof 'set-size! mailq)))
+                   (if (null? msgs)
+                       size
+                       (ref (last msgs 'bug) 2))))
+           (death-note (mesgof 'kill! mailq))
+           (players (filter (λ (p) (not (killed? death-note (car p)))) players))
+           (players (let loop ((msgs (mesgof 'set-pos-of! mailq)) (players players))
+                      (cond
+                       ((null? msgs) players)
+                       ((assoc (car (ref (car msgs) 2)) players) ;; player exists in mem, change data
+                        (loop (cdr msgs) (edit-player players (ref (car msgs) 2) (λ (pl) (ref (car msgs) 2)))))
+                       (else
+                        (loop (cdr msgs) (append players (list (ref (car msgs) 2))))))))
+           )
 
-         (when (not (null? death-note))
-           (print "death-note: " death-note))
+      (when (not (null? death-note))
+        (print "death-note: " death-note))
 
-         (when (killed? death-note player-name)
-           (print 'died)
-           (halt 0))
+      (when (killed? death-note player-name)
+        (print 'died)
+        (halt 0))
 
-         ;; ask the decider to update location every n frames or if i think a a point was touched
-         (when (or (any (λ (pt) (collision-circles? pt *point-radius* pos size)) points) (= frame-ctr 0))
-           (mail 'decider (tuple 'update-pos! pos)))
+      ;; ask the decider to update location every n frames or if i think a a point was touched
+      (when (or (any (λ (pt) (collision-circles? pt *point-radius* pos size)) points) (= frame-ctr 0))
+        (mail 'decider (tuple 'update-pos! pos)))
 
-         (draw
-          (clear-background gray)
-          (with-camera2d
-           camera
-           (begin
-             (draw-grid)
-             (for-each (λ (pos) (draw-circle pos *point-radius* green)) points)
-             (draw-player pos size red player-name)
-             (for-each (λ (pl) (draw-player (lref pl 3) (lref pl 2) blue (car pl))) players)
-             ))
-          (draw-map pos size points players)
-          (draw-leaderboard size player-name players)
-          (draw-fps 0 0)
-          )
-         (if (window-should-close?)
-             0
-             (loop
-              x
-              y
-              points
-              size
-              (+ zoom (* 0.01 (mouse-wheel)))
-              speed-mult
-              players
-              (modulo (+ frame-ctr 1) *frames-per-pos*))))))))
+      (draw
+       (clear-background gray)
+       (with-camera2d
+        camera
+        (begin
+          (draw-grid)
+          (for-each (λ (pos) (draw-circle pos *point-radius* green)) points)
+          (draw-player pos size red player-name)
+          (for-each (λ (pl) (draw-player (lref pl 3) (lref pl 2) blue (car pl))) players)
+          ))
+       (draw-map pos size points players)
+       (draw-leaderboard size player-name players)
+       (draw-fps 0 0)
+       )
+
+      (if (window-should-close?)
+          (die)
+          (loop
+           x
+           y
+           points
+           size
+           (+ zoom (* 0.01 (mouse-wheel)))
+           speed-mult
+           players
+           (modulo (+ frame-ctr 1) *frames-per-pos*))))))
 
 (define (connect-to-decider player-thread ip)
   (let* ((con (open-connection (sys/resolve-host ip) *port*))
@@ -226,21 +222,104 @@
           (write-bytes con fasl)
           (loop))))))
 
-(λ (args)
-  (let ((name (if (> (len args) 1) (lref args 1) "local player")))
-    (if (= (len args) 3)
-        (thread 'decider (connect-to-decider 'threadmain (lref args 2)))
-        (let ()
-          (start-player-adder)
-          (thread (let loop ((i 0))
-                    (if (= i 10)
-                        #t
-                        (let ((name (string-append "local-bot@" (number->string i))))
-                          (make-bot name (string->symbol name) (seed->rands (time-ns)))
-                          (sleep 10)
-                          (loop (+ 1 i))))))
+(define (start-online-lager srv uname)
+  (thread 'decider (connect-to-decider 'threadmain srv))
+  (thread 'threadmain (lager uname 'threadmain))
+  (lets ((_ v (next-mail)))
+    v))
 
-          (thread 'decider (decider))))
-    (start-asset-handler)
-    (thread 'threadmain (lager name 'threadmain))
-    0))
+(define (start-offline-lager srv uname)
+  (start-player-adder)
+  (thread 'decider (decider))
+  (thread 'threadmain (lager uname 'threadmain))
+  (let loop ((i 0))
+    (if (= i 10)
+        #t
+        (let ((uname (string-append "local-bot@" (number->string i))))
+          (make-bot uname (string->symbol uname) (seed->rands (time-ns)))
+          (sleep 10)
+          (loop (+ 1 i)))))
+  (lets ((_ v (next-mail)))
+    v))
+
+(define (input-box box picked? text)
+  (let ((font (asset 'font24)))
+    (draw-rectangle box gray)
+    (draw-rectangle-lines box 3 (if picked? red black))
+    (draw-text font text (list (+ 3 (car box)) (+ (cadr box) 6) (caddr box) (cadddr box)) 24 0 black)))
+
+(define (but-last l)
+  (reverse (cdr* (reverse l)))) ;; TODO: slow
+
+(define (update-text l)
+  (let ((updated (let loop ((acc #n))
+                   (let ((c (char-pressed)))
+                     (if (= c 0)
+                         (append l acc)
+                         (loop (append acc (list c))))))))
+    (if (key-pressed? key-backspace)
+        (but-last updated)
+        updated)))
+
+(define (menu)
+  (let ((font64 (asset 'font64))
+        (font32 (asset 'font32))
+        (font24 (asset 'font24))
+        (font (asset 'font)))
+    (let loop ((picked 'srv) (srv (string->list "pub.krzysckh.org")) (uname (string->list "local-player")))
+      (let* ((srv-box     (list (/ *window-size* 4) (* 3 (/ *window-size* 8)) (/ *window-size* 2) 32))
+             (uname-box   (list (/ *window-size* 4) (* 4 (/ *window-size* 8)) (/ *window-size* 2) 32))
+             (start-box   (list (/ *window-size* 4) (* 5 (/ *window-size* 8)) (/ *window-size* 2) 64))
+             (offline-box (list (/ *window-size* 4) (* 6 (/ *window-size* 8)) (/ *window-size* 2) 48))
+             (picked (cond
+                      ((collision-point-rect? (mouse-pos) srv-box) 'srv)
+                      ((collision-point-rect? (mouse-pos) uname-box) 'uname)
+                      ((collision-point-rect? (mouse-pos) start-box) 'start)
+                      ((collision-point-rect? (mouse-pos) offline-box) 'offline)
+                      (else picked)))
+             (srv (if (eq? picked 'srv) (update-text srv) srv))
+             (uname (if (eq? picked 'uname) (update-text uname) uname))
+             (bpressed? (mouse-btn-pressed? mouse-button-left))
+             )
+        (draw ;; rawdogging the gui
+         (clear-background gray)
+         (draw-grid)
+         (lets ((t "(lager)") (tw th (measure-text font64 t 64 0)))
+           (draw-text font64 t (list (- (/ *window-size* 2) (/ tw 2) -10) 90) 64 0 black)
+           (draw-text font64 t (list (- (/ *window-size* 2) (/ tw 2))     80) 64 0 white))
+
+         (input-box srv-box (eq? 'srv picked) (list->string srv))
+         (input-box uname-box (eq? 'uname picked) (list->string uname))
+
+         (draw-rectangle start-box gray)
+         (draw-rectangle-lines start-box 4 (if (eq? picked 'start) red black))
+
+         (lets ((t "(join)") (tw th (measure-text font32 t 32 0)))
+           (draw-text font32 t (list (- (/ *window-size* 2) (/ tw 2) -5) (+ (cadr start-box) 19)) 32 0 black)
+           (draw-text font32 t (list (- (/ *window-size* 2) (/ tw 2)) (+ (cadr start-box) 16)) 32 0 white))
+
+         (draw-rectangle offline-box gray)
+         (draw-rectangle-lines offline-box 4 (if (eq? picked 'offline) red black))
+
+         (lets ((t "(play-offline)") (tw th (measure-text font24 t 24 0)))
+           (draw-text font24 t (list (- (/ *window-size* 2) (/ tw 2) -5) (+ (cadr offline-box) 17)) 24 0 black)
+           (draw-text font24 t (list (- (/ *window-size* 2) (/ tw 2)) (+ (cadr offline-box) 12)) 24 0 white))
+         )
+
+        (cond
+         ((window-should-close?) (die))
+         ((and bpressed? (eq? picked 'start)) (start-online-lager (list->string srv) (list->string uname)))
+         ((and bpressed? (eq? picked 'offline)) (start-offline-lager (list->string srv) (list->string uname)))
+         (else
+          (loop picked srv uname)))))))
+
+(lambda (args)
+  (with-window
+   *window-size* *window-size* "*lager*"
+   (let ()
+     (set-target-fps! 60)
+     (set-exit-key! 0)
+     (start-asset-handler)
+     (initialize-default-assets)
+     (menu)
+     (wait-mail))))
