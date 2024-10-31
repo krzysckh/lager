@@ -13,13 +13,13 @@ ol-rl.exe:
 libraylib5-winlegacy.a:
 	wget -O $@ "https://pub.krzysckh.org/$@"
 lager-win.c: ol-rl.exe lager.scm
-	wine ol-rl.exe -o lager-win.c lager.scm
+	wine ol-rl.exe -O2 -o lager-win.c lager.scm
 lager.exe: lager-win.c libraylib5-winlegacy.a
-	i686-w64-mingw32-gcc -static -o lager.exe -I/usr/local/include lager-win.c -L. -l:libraylib5-winlegacy.a -lm -lopengl32 -lwinmm -lgdi32 -lws2_32
+	i686-w64-mingw32-gcc -O2 -static -o lager.exe -I/usr/local/include lager-win.c -L. -l:libraylib5-winlegacy.a -lm -lopengl32 -lwinmm -lgdi32 -lws2_32
 lager-server-win.c: ol-rl.exe lager-server.scm
-	wine ol-rl.exe -o lager-server-win.c lager-server.scm
+	wine ol-rl.exe -O2 -o lager-server-win.c lager-server.scm
 lager-server.exe: lager-server-win.c libraylib5-winlegacy.a
-	i686-w64-mingw32-gcc -static -o lager-server.exe -I/usr/local/include lager-server-win.c -L. -l:libraylib5-winlegacy.a -lm -lopengl32 -lwinmm -lgdi32 -lws2_32
+	i686-w64-mingw32-gcc -O2 -static -o lager-server.exe -I/usr/local/include lager-server-win.c -L. -l:libraylib5-winlegacy.a -lm -lopengl32 -lwinmm -lgdi32 -lws2_32
 lager.c: lager.scm
 	ol-rl $(OLFLAGS) -o lager.c lager.scm
 lager-bin: lager.c
