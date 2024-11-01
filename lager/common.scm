@@ -19,6 +19,7 @@
    n->u16
    reintern
    die
+   number->bot-name
    )
 
   (begin
@@ -89,5 +90,8 @@
     (define (die)
       (close-window)
       (catch-thread '_))
+
+    (define (number->bot-name i)
+      (string-append "local-bot@" (number->string i)))
 
     ))

@@ -17,6 +17,7 @@
    map:pad
    map:sz
    *port*
+   *n-bots*
    )
 
   (begin
@@ -41,5 +42,6 @@
     (define map:sz 150)
 
     (define *port* 8855)
+    (define *n-bots* 10)
 
     ))

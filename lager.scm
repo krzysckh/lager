@@ -168,10 +168,6 @@
       (when (not (null? death-note))
         (print "death-note: " death-note))
 
-      (when (killed? death-note player-name)
-        (print 'died)
-        (halt 0))
-
       ;; ask the decider to update location every n frames or if i think a a point was touched
       (when (or (any (λ (pt) (collision-circles? pt *point-radius* pos size)) points) (= frame-ctr 0))
         (mail 'decider (tuple 'update-pos! pos)))
@@ -191,23 +187,27 @@
        (draw-fps 0 0)
        )
 
-      (if (window-should-close?)
-          (die)
-          (loop
-           x
-           y
-           points
-           size
-           (+ zoom (* 0.01 (mouse-wheel)))
-           speed-mult
-           players
-           (modulo (+ frame-ctr 1) *frames-per-pos*))))))
+      (cond
+       ((window-should-close?) (die))
+       ((killed? death-note player-name) 0)
+       ((key-pressed? key-q) 0)
+       (else
+        (loop
+         x
+         y
+         points
+         size
+         (+ zoom (* 0.01 (mouse-wheel)))
+         speed-mult
+         players
+         (modulo (+ frame-ctr 1) *frames-per-pos*)))))))
 
 (define (connect-to-decider player-thread ip)
   (let* ((con (open-connection (sys/resolve-host ip) *port*))
          (bs (port->byte-stream con)))
     (print "[networked decider] con: " con)
     (thread
+     'networked-decider
      (let loop ()
        (when-readable con)
        (let* ((size (u16->n (bytevector->list (try-get-block con 2 #f))))
@@ -223,25 +223,35 @@
           (write-bytes con fasl)
           (loop))))))
 
+(define (cleanup-offline-lager)
+  (kill 'decider)
+  (kill 'add-player)
+  (for-each (λ (i) (kill (string->symbol (number->bot-name i)))) (iota 0 1 *n-bots*))
+  (set-target-fps! 15))
+
+(define (cleanup-online-lager)
+  (kill 'networked-decider)
+  (kill 'decider)
+  (set-target-fps! 15))
+
+;; TODO: shit doesn't work
 (define (start-online-lager srv uname)
   (thread 'decider (connect-to-decider 'threadmain srv))
-  (thread 'threadmain (lager uname 'threadmain))
-  (lets ((_ v (next-mail)))
-    v))
+  (lager uname 'threadmain)
+  (cleanup-online-lager))
 
 (define (start-offline-lager srv uname)
   (start-player-adder)
   (thread 'decider (decider))
-  (thread 'threadmain (lager uname 'threadmain))
   (let loop ((i 0))
     (if (= i 10)
         #t
-        (let ((uname (string-append "local-bot@" (number->string i))))
+        (let ((uname (number->bot-name i)))
           (make-bot uname (string->symbol uname) (seed->rands (time-ns)))
           (sleep 10)
           (loop (+ 1 i)))))
-  (lets ((_ v (next-mail)))
-    v))
+  (lager uname 'threadmain)
+  (cleanup-offline-lager))
 
 (define (input-box box picked? text)
   (let ((font (asset 'font24)))
@@ -310,8 +320,12 @@
 
         (cond
          ((window-should-close?) (die))
-         ((and bpressed? (eq? picked 'start)) (start-online-lager (list->string srv) (list->string uname)))
-         ((and bpressed? (eq? picked 'offline)) (start-offline-lager (list->string srv) (list->string uname)))
+         ((and bpressed? (eq? picked 'start))
+          (start-online-lager (list->string srv) (list->string uname))
+          (loop picked srv uname))
+         ((and bpressed? (eq? picked 'offline))
+          (start-offline-lager (list->string srv) (list->string uname))
+          (loop picked srv uname))
          (else
           (loop picked srv uname)))))))
 
@@ -322,5 +336,5 @@
      (set-exit-key! 0)
      (start-asset-handler)
      (initialize-default-assets)
-     (menu)
+     (thread 'threadmain (menu))
      (wait-mail))))
