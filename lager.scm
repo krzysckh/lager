@@ -290,7 +290,10 @@
         (font32 (asset 'font32))
         (font24 (asset 'font24))
         (font (asset 'font)))
-    (let loop ((picked 'srv) (srv (string->list "pub.krzysckh.org")) (uname (string->list "local-player")))
+    (let loop ((picked 'srv)
+               (srv (string->list "pub.krzysckh.org"))
+               (uname (string->list "local-player"))
+               (err #f))
       (let* ((srv-box     (list (/ *window-size* 4) (* 3 (/ *window-size* 8)) (/ *window-size* 2) 32))
              (uname-box   (list (/ *window-size* 4) (* 4 (/ *window-size* 8)) (/ *window-size* 2) 32))
              (start-box   (list (/ *window-size* 4) (* 5 (/ *window-size* 8)) (/ *window-size* 2) 64))
@@ -308,6 +311,10 @@
         (draw ;; rawdogging the gui
          (clear-background gray)
          (draw-grid)
+         (when (list? err)
+           (lets ((t (str err)) (tw th (measure-text font t 16 0)))
+             (draw-text font t (list (- (/ *window-size* 2) (/ tw 2)) 20) 16 0 black)))
+
          (lets ((t "(lager)") (tw th (measure-text font64 t 64 0)))
            (draw-text font64 t (list (- (/ *window-size* 2) (/ tw 2) -10) 90) 64 0 black)
            (draw-text font64 t (list (- (/ *window-size* 2) (/ tw 2))     80) 64 0 white))
@@ -333,13 +340,11 @@
         (cond
          ((window-should-close?) (die))
          ((and bpressed? (eq? picked 'start))
-          (print "res: " (start-online-lager (list->string srv) (list->string uname)))
-          (loop picked srv uname))
+          (loop picked srv uname (start-online-lager (list->string srv) (list->string uname))))
          ((and bpressed? (eq? picked 'offline))
-          (print "res: " (start-offline-lager (list->string srv) (list->string uname)))
-          (loop picked srv uname))
+          (loop picked srv uname (start-offline-lager (list->string srv) (list->string uname))))
          (else
-          (loop picked srv uname)))))))
+          (loop picked srv uname err)))))))
 
 (lambda (args)
   (with-window
