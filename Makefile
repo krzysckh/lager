@@ -18,6 +18,8 @@ $(COMP_OLRL):
 	chmod +x $@
 ol-rl.exe:
 	wget -O $@ "https://pub.krzysckh.org/$@"
+libraylib5-web.a:
+	wget -O $@ "https://pub.krzysckh.org/$@"
 libraylib5-winlegacy.a:
 	wget -O $@ "https://pub.krzysckh.org/$@"
 lager-win.c: ol-rl.exe lager.scm
@@ -36,7 +38,13 @@ lager-bin: lager.c $(COMP_RAYLIB)
 	$(CC) -o lager-bin lager.c $(CFLAGS) $(LDFLAGS)
 clean:
 	rm -f lager-bin lager.exe *.c
-packup: lager.exe lager-server.exe lager-bin lager.c lager-server.c
+build/lager.html: lager.c libraylib5-web.a
+	emcc -O2 -DPLATFORM_WEB -I/usr/local/include lager.c \
+		libraylib5-web.a --shell-file emshell.html \
+		-o build/lager.html \
+		-s USE_GLFW=3 -s ERROR_ON_UNDEFINED_SYMBOLS=0 \
+		-s ALLOW_MEMORY_GROWTH=1 -s ASYNCIFY -s ASSERTIONS=0 || true
+packup: lager.exe lager-server.exe lager-bin lager.c lager-server.c build/lager.html
 	mkdir -p build
 	cp -v lager.exe build
 	cp -v lager-server.exe build

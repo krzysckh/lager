@@ -155,6 +155,7 @@
                        size
                        (ref (last msgs 'bug) 2))))
            (death-note (mesgof 'kill! mailq))
+           (errors (mesgof 'error mailq))
            (players (let loop ((msgs (mesgof 'set-pos-of! mailq)) (players players))
                       (cond
                        ((null? msgs) players)
@@ -191,6 +192,7 @@
        ((window-should-close?) (die))
        ((killed? death-note player-name) 0)
        ((key-pressed? key-q) 0)
+       ((> (len errors) 0) errors)
        (else
         (loop
          x
@@ -206,22 +208,32 @@
   (let* ((con (open-connection (sys/resolve-host ip) *port*))
          (bs (port->byte-stream con)))
     (print "[networked decider] con: " con)
-    (thread
-     'networked-decider
-     (let loop ()
-       (when-readable con)
-       (let* ((size (u16->n (bytevector->list (try-get-block con 2 #f))))
-              (b (bytevector->list (try-get-block con size #t)))
-              (v (reintern (fasl-decode b (tuple 'bad)))))
-         (mail player-thread v)
-         (loop))))
+    (if con
+        (let ()
+          (thread
+           'networked-decider
+           (let loop ()
+             (when-readable con)
+             (let* ((size (u16->n (bytevector->list (try-get-block con 2 #f))))
+                    (b (bytevector->list (try-get-block con size #t)))
+                    (v (reintern (fasl-decode b (tuple 'bad)))))
+               (mail player-thread v)
+               (loop))))
 
-    (let loop ()
-      (lets ((who v (next-mail)))
-        (let ((fasl (fasl-encode v)))
-          (write-bytes con (n->u16 (len fasl)))
-          (write-bytes con fasl)
-          (loop))))))
+          (let loop ()
+            (lets ((who v (next-mail)))
+              (let ((fasl (fasl-encode v)))
+                (write-bytes con (n->u16 (len fasl)))
+                (write-bytes con fasl)
+                (loop)))))
+        (mail 'threadmain (tuple 'error (string-append "Couldn't connect to " ip))))))
+
+(define-syntax prog1
+  (syntax-rules ()
+    ((prog1 exp1 e ...)
+     (let ((_res exp1))
+       e ...
+       _res))))
 
 (define (cleanup-offline-lager)
   (kill 'decider)
@@ -237,8 +249,8 @@
 ;; TODO: shit doesn't work
 (define (start-online-lager srv uname)
   (thread 'decider (connect-to-decider 'threadmain srv))
-  (lager uname 'threadmain)
-  (cleanup-online-lager))
+  (prog1 (lager uname 'threadmain)
+    (cleanup-online-lager)))
 
 (define (start-offline-lager srv uname)
   (start-player-adder)
@@ -250,8 +262,8 @@
           (make-bot uname (string->symbol uname) (seed->rands (time-ns)))
           (sleep 10)
           (loop (+ 1 i)))))
-  (lager uname 'threadmain)
-  (cleanup-offline-lager))
+  (prog1 (lager uname 'threadmain)
+    (cleanup-offline-lager)))
 
 (define (input-box box picked? text)
   (let ((font (asset 'font24)))
@@ -321,10 +333,10 @@
         (cond
          ((window-should-close?) (die))
          ((and bpressed? (eq? picked 'start))
-          (start-online-lager (list->string srv) (list->string uname))
+          (print "res: " (start-online-lager (list->string srv) (list->string uname)))
           (loop picked srv uname))
          ((and bpressed? (eq? picked 'offline))
-          (start-offline-lager (list->string srv) (list->string uname))
+          (print "res: " (start-offline-lager (list->string srv) (list->string uname)))
           (loop picked srv uname))
          (else
           (loop picked srv uname)))))))
