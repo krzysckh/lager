@@ -56,8 +56,8 @@ pubcpy: lager.exe lager-server.exe
 	yes | pubcpy tmp lager.exe
 	yes | pubcpy tmp lager-server.exe
 test: $(COMP_OLRL)
-	$(COMP_OLRL) -r lager-server.scm & ( sleep 1 ; $(COMP_OLRL) -r lager.scm "local player" localhost )
-test-local:
-	ol-rl -r lager-server.scm & ( sleep 1 ; ol-rl -r lager.scm "local player" localhost )
+	$(COMP_OLRL) -r lager-server.scm & ( sleep 1 ; $(COMP_OLRL) -r lager.scm ) & ( read _ )
+test2: $(COMP_OLRL)
+	$(COMP_OLRL) -r lager-server.scm & ( sleep 1 ; $(COMP_OLRL) -r lager.scm ) & ( sleep 1 ; $(COMP_OLRL) -r lager.scm ) & ( read _ )
 win-test: lager.exe lager-server.exe
-	wine lager-server.exe & ( sleep 2 ; wine lager.exe "local player" localhost )
+	wine lager-server.exe & ( sleep 2 ; wine lager.exe )

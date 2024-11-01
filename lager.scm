@@ -119,6 +119,10 @@
              (if (string=? (cadar ps) player-name) red black))
             (loop (+ 1 i) (cdr ps)))))))
 
+(define (exit ret)
+  (mail 'decider (tuple 'exiting!))
+  ret)
+
 (define (lager player-name thrname)
   ;; TODO: figure this out as in local player mode it **will block** and decider will be slowed down
   ;; figure out = add delta time to compensate lower frame rates and don't give unfair advantage to higher frame rates
@@ -190,9 +194,9 @@
 
       (cond
        ((window-should-close?) (die))
-       ((killed? death-note player-name) 0)
-       ((key-pressed? key-q) 0)
-       ((> (len errors) 0) errors)
+       ((killed? death-note player-name) (exit 0))
+       ((key-pressed? key-q) (exit 0))
+       ((> (len errors) 0) (exit errors))
        (else
         (loop
          x
@@ -222,10 +226,14 @@
 
           (let loop ()
             (lets ((who v (next-mail)))
-              (let ((fasl (fasl-encode v)))
-                (write-bytes con (n->u16 (len fasl)))
-                (write-bytes con fasl)
-                (loop)))))
+              (tuple-case v
+                ((die!)
+                 'bye!)
+                (else
+                 (let ((fasl (fasl-encode v)))
+                   (write-bytes con (n->u16 (len fasl)))
+                   (write-bytes con fasl)
+                   (loop)))))))
         (mail 'threadmain (tuple 'error (string-append "Couldn't connect to " ip))))))
 
 (define-syntax prog1
@@ -243,7 +251,7 @@
 
 (define (cleanup-online-lager)
   (kill 'networked-decider)
-  (kill 'decider)
+  (mail 'decider (tuple 'die!))
   (set-target-fps! 15))
 
 ;; TODO: shit doesn't work
@@ -291,7 +299,7 @@
         (font24 (asset 'font24))
         (font (asset 'font)))
     (let loop ((picked 'srv)
-               (srv (string->list "pub.krzysckh.org"))
+               (srv (string->list *default-srv*))
                (uname (string->list "local-player"))
                (err #f))
       (let* ((srv-box     (list (/ *window-size* 4) (* 3 (/ *window-size* 8)) (/ *window-size* 2) 32))

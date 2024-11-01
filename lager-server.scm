@@ -13,6 +13,11 @@
          (let* ((size (u16->n (bytevector->list (try-get-block fd 2 #f))))
                 (res (reintern (fasl-decode (bytevector->list (try-get-block fd size #t)) (tuple 'bad)))))
            (tuple-case res
+             ((bad)
+              (print "[client handler] invalid fasl received")
+              (mail 'decider (tuple 'exiting!))
+              (close-port fd)
+              (kill thrname))
              ((add-player! name thread)
               (mail 'decider (tuple 'add-player! name thrname)))
              (else

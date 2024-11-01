@@ -18,6 +18,7 @@
    map:sz
    *port*
    *n-bots*
+   *default-srv*
    )
 
   (begin
@@ -43,5 +44,7 @@
 
     (define *port* 8855)
     (define *n-bots* 10)
+    (define *default-srv* "localhost")
+    ;; (define *default-srv* "pub.krzysckh.org")
 
     ))
