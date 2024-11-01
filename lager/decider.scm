@@ -24,7 +24,7 @@
         (print "decider ready")
         (let loop ((players #n) (points points) (rs rs))
           (lets ((who m (next-mail)))
-            (print "who: " who ", m: " m)
+            ;; (print "who: " who ", m: " m)
             (tuple-case m
               ((add-player! name thread) ;; TODO: check if a player can be added
                (print "add-player!: will send data to " thread ", who=" who)
@@ -78,18 +78,14 @@
                                                  (cond
                                                   ((null? pts) (values cacc racc))
                                                   ((collision-circles? (car pts) *point-radius* pos (lref (car player) 2))
-                                                   (mail who (tuple 'set-size! (+ (lref (car player) 2) 1)))
-                                                   (print who ": sized " (+ (lref (car player) 2) 1))
                                                    (mail* (player-threads players) (tuple 'del! (car pts)))
                                                    (loop (append cacc (list (car pts))) racc (cdr pts)))
                                                   (else
                                                    (loop cacc (append racc (list (car pts))) (cdr pts)))))))
+                           (mail who (tuple 'set-size! (+ psz (len collided))))
                            (let L ((rs rs) (acc #n) (p collided))
                              (if (null? p)
-                                 (loop (if (null? collided)
-                                           (edit-player players (car player) (λ (pl) (lset* pl 3 pos)))
-                                           (edit-player players (car player) (λ (pl) (lset* (lset pl 2 (+ psz 1)) 3 pos))))
-                                       (append rest acc) rs)
+                                 (loop (edit-player players (car player) (λ (pl) (lset* (lset pl 2 (+ psz (len collided))) 3 pos))) (append rest acc) rs)
                                  (lets ((rs pt (random-point rs min max)))
                                    (mail* (player-threads players) (tuple 'add! pt))
                                    (L rs (append acc (list pt)) (cdr p)))))))))))
