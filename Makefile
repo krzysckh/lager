@@ -2,12 +2,17 @@ LDFLAGS:=-L/usr/local/lib -lraylib -lm
 CFLAGS=-O2 -Wall -g -I/usr/local/include
 OLFLAGS=-O3
 
+COMP_OLRL=./ol-rl-x86_64-linux-gnu
+
 OS!=uname -s
 
 .if $(OS) == "OpenBSD"
 LDFLAGS:=$(LDFLAGS) -lpthread
 .endif
 
+$(COMP_OLRL):
+	wget -O $@ "https://pub.krzysckh.org/$@"
+	chmod +x $@
 ol-rl.exe:
 	wget -O $@ "https://pub.krzysckh.org/$@"
 libraylib5-winlegacy.a:
@@ -20,8 +25,8 @@ lager-server-win.c: ol-rl.exe lager-server.scm
 	wine ol-rl.exe -o lager-server-win.c lager-server.scm
 lager-server.exe: lager-server-win.c libraylib5-winlegacy.a
 	i686-w64-mingw32-gcc -static -o lager-server.exe -I/usr/local/include lager-server-win.c -L. -l:libraylib5-winlegacy.a -lm -lopengl32 -lwinmm -lgdi32 -lws2_32
-lager.c: lager.scm
-	ol-rl $(OLFLAGS) -o lager.c lager.scm
+lager.c: $(COMP_OLRL) lager.scm
+	$(COMP_OLRL) $(OLFLAGS) -o lager.c lager.scm
 lager-bin: lager.c
 	$(CC) -o lager-bin lager.c $(CFLAGS) $(LDFLAGS)
 clean:
@@ -35,7 +40,9 @@ packup: lager.exe lager-server.exe lager-bin lager.c
 pubcpy: lager.exe lager-server.exe
 	yes | pubcpy tmp lager.exe
 	yes | pubcpy tmp lager-server.exe
-test:
+test: $(COMP_OLRL)
+	$(COMP_OLRL) -r lager-server.scm & ( sleep 1 ; $(COMP_OLRL) -r lager.scm "local player" localhost )
+test-local:
 	ol-rl -r lager-server.scm & ( sleep 1 ; ol-rl -r lager.scm "local player" localhost )
 win-test: lager.exe lager-server.exe
 	wine lager-server.exe & ( sleep 2 ; wine lager.exe "local player" localhost )
