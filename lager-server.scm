@@ -32,9 +32,7 @@
               (mail 'decider res)))))
 
        (if-lets ((_ v (maybe-next-mail)))
-         (let ((fasl (fasl-encode v)))
-           (write-bytes fd (n->u16 (len fasl)))
-           (write-bytes fd fasl)))
+         (send-fasl fd v))
 
        (loop)))))
 

@@ -230,10 +230,8 @@
                 ((die!)
                  'bye!)
                 (else
-                 (let ((fasl (fasl-encode v)))
-                   (write-bytes con (n->u16 (len fasl)))
-                   (write-bytes con fasl)
-                   (loop)))))))
+                 (send-fasl con v)
+                 (loop))))))
         (mail 'threadmain (tuple 'error (string-append "Couldn't connect to " ip))))))
 
 (define-syntax prog1

@@ -20,6 +20,7 @@
    reintern
    die
    number->bot-name
+   send-fasl
    )
 
   (begin
@@ -93,5 +94,10 @@
 
     (define (number->bot-name i)
       (string-append "local-bot@" (number->string i)))
+
+    (define (send-fasl fd v)
+      (let ((fasl (fasl-encode v)))
+        (write-bytes fd (n->u16 (len fasl)))
+        (write-bytes fd fasl)))
 
     ))
