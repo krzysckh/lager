@@ -30,6 +30,8 @@ lager-server.exe: lager-server-win.c libraylib5-winlegacy.a
 	i686-w64-mingw32-gcc -static -o lager-server.exe -I/usr/local/include lager-server-win.c -L. -l:libraylib5-winlegacy.a -lm -lopengl32 -lwinmm -lgdi32 -lws2_32
 lager.c: $(COMP_OLRL) lager.scm
 	$(COMP_OLRL) $(OLFLAGS) -o lager.c lager.scm
+lager-server.c: $(COMP_OLRL) lager-server.scm
+	$(COMP_OLRL) $(OLFLAGS) -o lager-server.c lager-server.scm
 lager-bin: lager.c $(COMP_RAYLIB)
 	$(CC) -o lager-bin lager.c $(CFLAGS) $(LDFLAGS)
 clean:
@@ -40,6 +42,7 @@ packup: lager.exe lager-server.exe lager-bin lager.c
 	cp -v lager-server.exe build
 	cp -v lager-bin build/lager-`$(CC) -dumpmachine`
 	cp -v lager.c build
+	cp -v lager-server.c build
 	cp -v _quickbuild.sh build/quickbuild.sh
 pubcpy: lager.exe lager-server.exe
 	yes | pubcpy tmp lager.exe
