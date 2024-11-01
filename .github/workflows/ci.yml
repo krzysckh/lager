@@ -22,7 +22,7 @@ jobs:
           sudo add-apt-repository universe
           sudo dpkg --add-architecture i386
           sudo apt update
-          sudo apt install -y wine wine32 bmake
+          sudo apt install -y wine wine32 bmake clang
       - name: Setup raylib
         shell: bash
         run: |
@@ -31,7 +31,7 @@ jobs:
       - name: Build lager
         shell: bash
         run: |
-          bmake packup
+          bmake packup CC=clang
       - name: Upload as artifact
         uses: actions/upload-artifact@v3
         with:
