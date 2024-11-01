@@ -129,6 +129,7 @@
   ;;   (else
   ;;    #t))
 
+  (set-target-fps! 60)
   (mail 'decider (tuple 'add-player! player-name thrname))
 
   (let loop ((x 0)
@@ -154,7 +155,6 @@
                        size
                        (ref (last msgs 'bug) 2))))
            (death-note (mesgof 'kill! mailq))
-           (players (filter (λ (p) (not (killed? death-note (car p)))) players))
            (players (let loop ((msgs (mesgof 'set-pos-of! mailq)) (players players))
                       (cond
                        ((null? msgs) players)
@@ -162,6 +162,7 @@
                         (loop (cdr msgs) (edit-player players (ref (car msgs) 2) (λ (pl) (ref (car msgs) 2)))))
                        (else
                         (loop (cdr msgs) (append players (list (ref (car msgs) 2))))))))
+           (players (filter (λ (p) (not (killed? death-note (car p)))) players))
            )
 
       (when (not (null? death-note))
@@ -257,11 +258,12 @@
                      (if (= c 0)
                          (append l acc)
                          (loop (append acc (list c))))))))
-    (if (key-pressed? key-backspace)
+    (if (key-down? key-backspace)
         (but-last updated)
         updated)))
 
 (define (menu)
+  (set-target-fps! 15)
   (let ((font64 (asset 'font64))
         (font32 (asset 'font32))
         (font24 (asset 'font24))
@@ -317,7 +319,6 @@
   (with-window
    *window-size* *window-size* "*lager*"
    (let ()
-     (set-target-fps! 60)
      (set-exit-key! 0)
      (start-asset-handler)
      (initialize-default-assets)
