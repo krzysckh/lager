@@ -17,12 +17,11 @@
      (let loop ()
        (when (readable? fd)
          (let* ((bv (try-get-block fd 2 #t))
-                (_ (print bv))
                 (size (u16->n (bytevector->list bv)))
                 (res (reintern (fasl-decode (bytevector->list (try-get-block fd size #t)) (tuple 'bad)))))
            (tuple-case res
              ((bad)
-              (print "[client handler] invalid fasl received")
+              (print "[client handler] invalid fasl received") ;; TODO: make sure this never happens
               ;; (mail 'decider (tuple 'exiting!))
               ;; (close-port fd)
               ;; (kill thrname))
