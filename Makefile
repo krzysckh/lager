@@ -26,10 +26,12 @@ lager-bin: lager.c
 	$(CC) -o lager-bin lager.c $(CFLAGS) $(LDFLAGS)
 clean:
 	rm -f lager-bin lager.exe *.c
-packup: lager.exe lager-server.exe
+packup: lager.exe lager-server.exe lager-bin lager.c
 	mkdir -p build
 	cp -v lager.exe build
 	cp -v lager-server.exe build
+	cp -v lager-bin build/lager-`$(CC) -dumpmachine`
+	cp -v lager.c build
 pubcpy: lager.exe lager-server.exe
 	yes | pubcpy tmp lager.exe
 	yes | pubcpy tmp lager-server.exe
