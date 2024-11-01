@@ -36,7 +36,7 @@ lager-bin: lager.c $(COMP_RAYLIB)
 	$(CC) -o lager-bin lager.c $(CFLAGS) $(LDFLAGS)
 clean:
 	rm -f lager-bin lager.exe *.c
-packup: lager.exe lager-server.exe lager-bin lager.c
+packup: lager.exe lager-server.exe lager-bin lager.c lager-server.c
 	mkdir -p build
 	cp -v lager.exe build
 	cp -v lager-server.exe build
