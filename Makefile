@@ -40,6 +40,7 @@ packup: lager.exe lager-server.exe lager-bin lager.c
 	cp -v lager-server.exe build
 	cp -v lager-bin build/lager-`$(CC) -dumpmachine`
 	cp -v lager.c build
+	cp -v _quickbuild.sh build/quickbuild.sh
 pubcpy: lager.exe lager-server.exe
 	yes | pubcpy tmp lager.exe
 	yes | pubcpy tmp lager-server.exe
