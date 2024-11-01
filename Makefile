@@ -37,7 +37,7 @@ lager-server.c: $(COMP_OLRL) lager-server.scm
 lager-bin: lager.c $(COMP_RAYLIB)
 	$(CC) -o lager-bin lager.c $(CFLAGS) $(LDFLAGS)
 clean:
-	rm -f lager-bin lager.exe *.c
+	rm -fr build lager-bin lager.exe *.c
 build/lager.html: lager.c libraylib5-web.a
 	emcc -O2 -DPLATFORM_WEB -I/usr/local/include lager.c \
 		libraylib5-web.a --shell-file emshell.html \
