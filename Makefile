@@ -39,6 +39,7 @@ lager-bin: lager.c $(COMP_RAYLIB)
 clean:
 	rm -fr build lager-bin lager.exe *.c
 build/lager.html: lager.c libraylib5-web.a
+	mkdir -p build
 	emcc -O2 -DPLATFORM_WEB -I/usr/local/include lager.c \
 		libraylib5-web.a --shell-file emshell.html \
 		-o build/lager.html \
