@@ -16,20 +16,27 @@
      thrname
      (let loop ()
        (when (readable? fd)
-         (let* ((bv (try-get-block fd 2 #t))
-                (size (u16->n (bytevector->list bv)))
-                (res (reintern (fasl-decode (bytevector->list (try-get-block fd size #t)) (tuple 'bad)))))
-           (tuple-case res
-             ((bad)
-              (print "[client handler] invalid fasl received") ;; TODO: make sure this never happens
-              ;; (mail 'decider (tuple 'exiting!))
-              ;; (close-port fd)
-              ;; (kill thrname))
-              )
-             ((add-player! name thread)
-              (mail 'decider (tuple 'add-player! name thrname)))
-             (else
-              (mail 'decider res)))))
+         (let* ((bv (try-get-block fd 2 #t)))
+           ;; eq? instead of = bc (bytevector-length) on #f yields #f and = on #f yields an (error)
+           (if (eq? (bytevector-length bv) 2)
+               (let* ((size (u16->n (bytevector->list bv)))
+                      (res (reintern (fasl-decode (bytevector->list (try-get-block fd size #t)) (tuple 'bad)))))
+                 (tuple-case res
+                   ((bad)
+                    (print "[client handler] invalid fasl received") ;; TODO: make sure this never happens
+                    ;; (mail 'decider (tuple 'exiting!))
+                    ;; (close-port fd)
+                    ;; (kill thrname))
+                    )
+                   ((add-player! name thread)
+                    (mail 'decider (tuple 'add-player! name thrname)))
+                   (else
+                    (mail 'decider res))))
+               (let ()
+                 (print "2 != 2 bailing out")
+                 (mail 'decider (tuple 'exiting!))
+                 (close-port fd)
+                 (kill thrname)))))
 
        (if-lets ((_ v (maybe-next-mail)))
          (send-fasl fd v))
