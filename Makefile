@@ -52,6 +52,7 @@ packup: lager.exe lager-server.exe lager-bin lager.c lager-server.c build/lager.
 	cp -v lager.c build
 	cp -v lager-server.c build
 	cp -v _quickbuild.sh build/quickbuild.sh
+	cp -v README.md build
 pubcpy: lager.exe lager-server.exe
 	yes | pubcpy tmp lager.exe
 	yes | pubcpy tmp lager-server.exe
