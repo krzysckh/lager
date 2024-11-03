@@ -6,7 +6,7 @@ half of an agar.io clone
   - download/install [raylib-owl](https://krzysckh.org/prog/raylib-owl.html)
   - run
     ```sh
-    $ ol-rl lager.scm
+    $ ol-rl -r lager.scm
     ```
 * (or) From a linux/windows binary
   - grab the newest build from the actions or releases tab
