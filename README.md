@@ -25,3 +25,8 @@ half of an agar.io clone
 ## Servers
 
 For the time of itch.io voting, there will be a public server running on `pub.krzysckh.org` (Sofia, Bulgaria).
+
+
+## Bugs
+
+yes. lots of them in fact.
