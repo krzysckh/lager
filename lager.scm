@@ -141,15 +141,14 @@
              (points #n)
              (size 0)
              (zoom 1.0)
-             (speed-mult 2.0)
              (players ())
              (frame-ctr 0)
              )
     (lets ((mailq (get-mailq))
            (mp (map (λ (v) (remap v 0 *window-size* -1 1)) (mouse-pos)))
            (x y (values
-                 (+ x (* speed-mult *speed-base* (car mp)))
-                 (+ y (* speed-mult *speed-base* (cadr mp)))))
+                 (+ x (* (/ 1 (+ 1 size)) *speed-base* (car mp)))
+                 (+ y (* (/ 1 (+ 1 size)) *speed-base* (cadr mp)))))
            (pos (list x y))
            (camera (list *cam-offset* pos 0 zoom))
            ;; update data based on mailq
@@ -194,17 +193,16 @@
 
       (cond
        ((window-should-close?) (die))
-       ((killed? death-note player-name) (exit 0))
+       ((killed? death-note player-name) (exit (list "you died!")))
        ((key-pressed? key-q) (exit 0))
        ((> (len errors) 0) (exit errors))
        (else
         (loop
-         x
-         y
+         (clamp x (- 0 *map-size*) *map-size*)
+         (clamp y (- 0 *map-size*) *map-size*)
          points
          size
-         (+ zoom (* 0.01 (mouse-wheel)))
-         speed-mult
+         (max 0.1 (+ zoom (* 0.005 (mouse-wheel))))
          players
          (modulo (+ frame-ctr 1) *frames-per-pos*)))))))
 

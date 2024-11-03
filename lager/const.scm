@@ -1,6 +1,7 @@
 (define-library (lager const)
   (import
-   (owl toplevel))
+   (owl toplevel)
+   (scheme process-context))
 
   (export
    *window-size*
@@ -19,6 +20,7 @@
    *port*
    *n-bots*
    *default-srv*
+   weblager?
    )
 
   (begin
@@ -30,7 +32,7 @@
     (define *point-radius* 10)
     (define *frames-per-pos* 8)
 
-    (define *speed-base* 5)
+    (define *speed-base* 100)
     (define *map-mult* 2)
     (define *map-size* (* *window-size* 4))
 
@@ -42,9 +44,14 @@
     (define map:pad 20)
     (define map:sz 150)
 
-    (define *port* 8855)
+    (define _*port* 8855)
+    (define *weblager?* (string=? (last (command-line) "") "WEBLAGER"))
+    (define (weblager?) *weblager?*)
+
+    (define *port* (if (weblager?) (+ _*port* 1) _*port*))
+
     (define *n-bots* 10)
-    (define *default-srv* "localhost")
-    ;; (define *default-srv* "pub.krzysckh.org")
+    ;; (define *default-srv* "localhost")
+    (define *default-srv* "pub.krzysckh.org")
 
     ))

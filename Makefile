@@ -32,20 +32,29 @@ lager-server.exe: lager-server-win.c libraylib5-winlegacy.a
 	i686-w64-mingw32-gcc -static -o lager-server.exe -I/usr/local/include lager-server-win.c -L. -l:libraylib5-winlegacy.a -lm -lopengl32 -lwinmm -lgdi32 -lws2_32
 lager.c: $(COMP_OLRL) lager.scm
 	$(COMP_OLRL) $(OLFLAGS) -o lager.c lager.scm
+weblager.c: $(COMP_OLRL) lager.scm
+	$(COMP_OLRL) $(OLFLAGS) -o weblager.c lager.scm -i WEBLAGER
 lager-server.c: $(COMP_OLRL) lager-server.scm
 	$(COMP_OLRL) $(OLFLAGS) -o lager-server.c lager-server.scm
 lager-bin: lager.c $(COMP_RAYLIB)
 	$(CC) -o lager-bin lager.c $(CFLAGS) $(LDFLAGS)
 clean:
 	rm -fr build lager-bin lager.exe *.c
-build/lager.html: lager.c libraylib5-web.a
+build/lager.html: weblager.c libraylib5-web.a
 	mkdir -p build
-	emcc -O2 -DPLATFORM_WEB -I/usr/local/include lager.c \
+	emcc -O2 -DPLATFORM_WEB -I/usr/local/include weblager.c \
 		libraylib5-web.a --shell-file emshell.html \
 		-o build/lager.html \
 		-s USE_GLFW=3 -s ERROR_ON_UNDEFINED_SYMBOLS=0 \
+		-lwebsocket.js \
+		-s WEBSOCKET_SUBPROTOCOL=binary \
 		-s ALLOW_MEMORY_GROWTH=1 -s ASYNCIFY -s ASSERTIONS=0 || true
-packup: lager.exe lager-server.exe lager-bin lager.c lager-server.c build/lager.html
+build/weblager.zip: build/lager.html
+	rm -f build/weblager.zip
+	mv build/lager.html build/index.html
+	cd build ; zip weblager.zip index.html lager.js lager.wasm
+	rm build/index.html build/lager.wasm build/lager.js
+packup: lager.exe lager-server.exe lager-bin lager.c lager-server.c build/weblager.zip
 	mkdir -p build
 	cp -v lager.exe build
 	cp -v lager-server.exe build
