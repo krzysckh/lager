@@ -64,6 +64,7 @@
                                                     ((> psz (lref p 2))
                                                      (loop (cdr players) (+ acc (lref p 2)) (append deleted (list p))))
                                                     ((< psz (lref p 2))
+                                                     (mail p (tuple 'set-size!  (+ psz (lref p 2))))
                                                      (loop (cdr players) 0 (append deleted (list (car player)))))
                                                     (else
                                                      (loop (cdr players) acc deleted)))
