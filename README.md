@@ -8,18 +8,18 @@ half of an agar.io clone
     ```sh
     $ ol-rl lager.scm
     ```
-* A linux/windows binary
-  - grab the newest build from the actions tab
+* (or) From a linux/windows binary
+  - grab the newest build from the actions or releases tab
   - run the binary for your system
-* From a c file with a fasl blob (linux x86_64-only)
-  - grab the newest build from the actions tab 
+* (or) From a c file with a fasl blob (linux x86_64-only)
+  - grab the newest build from the actions or releases tab 
   - run
     ```sh
     $ chmod +x quickbuild.sh
     $ ./quickbuild.sh
     ```
-* From a c file with a fasl blob (unix)
-  - grab the newest build from the actions tab 
+* (or) From a c file with a fasl blob (unix)
+  - grab the newest build from the actions or releases tab 
   - compile `lager.c` with raylib `f1007554a0a8145060797c0aa8169bdaf2c1c6b8`
 
 ## Servers
