@@ -49,7 +49,7 @@
       (filter (λ (x) (eq? (ref x 1) sym)) q))
 
     (define (killed? l player-name)
-      (has? (map (λ (t) (car (ref t 2))) l) player-name))
+      (has? (map (λ (t) (car* (ref t 2))) l) player-name))
 
     (define (get-mailq)
       (let loop ((acc #n))

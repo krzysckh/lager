@@ -29,8 +29,9 @@
               ((exiting!)
                (let ((ps (filter (λ (x) (not (equal? (lref x 1) who))) players))
                      (del (car* (filter (λ (x) (equal? (lref x 1) who)) players))))
-                 (print del " is exiting, will mail to " ps)
-                 (mail* (player-threads ps) (tuple 'kill! del))
+                 (when (not (null? del))
+                   (print del " is exiting, will mail to " ps)
+                   (mail* (player-threads ps) (tuple 'kill! del)))
                  (loop ps points rs)))
               ((add-player! name thread) ;; TODO: check if a player can be added
                (print "add-player!: will send data to " thread ", who=" who)
