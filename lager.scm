@@ -139,7 +139,7 @@
   (let loop ((x 0)
              (y 0)
              (points #n)
-             (size 0)
+             (size 10)
              (zoom 1.0)
              (players ())
              (frame-ctr 0)
