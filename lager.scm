@@ -230,7 +230,9 @@
                 (else
                  (send-fasl con v)
                  (loop))))))
-        (mail 'threadmain (tuple 'error (string-append "Couldn't connect to " ip))))))
+        (if (weblager?)
+            (mail 'threadmain (tuple 'error (string-append "Connecting to servers unsupported in web builds")))
+            (mail 'threadmain (tuple 'error (string-append "Couldn't connect to " ip)))))))
 
 (define-syntax prog1
   (syntax-rules ()
